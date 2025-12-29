@@ -1,0 +1,223 @@
+"use client";
+
+import { ListingBehaviorSignals, PricingBehaviorSignals, SellerProfileConsistency } from "@/types/vehicle";
+import { AlertTriangle, TrendingUp, UserCheck, Shield, TrendingDown } from "lucide-react";
+
+interface SellerSignalsCardProps {
+  listingBehavior?: ListingBehaviorSignals;
+  pricingBehavior?: PricingBehaviorSignals;
+  profileConsistency?: SellerProfileConsistency;
+  tier?: 'free' | 'paid';
+}
+
+export function SellerSignalsCard({
+  listingBehavior,
+  pricingBehavior,
+  profileConsistency,
+  tier = 'free'
+}: SellerSignalsCardProps) {
+  const hasRelisting = listingBehavior?.relistingDetection?.detected;
+  const relistingCount = listingBehavior?.relistingDetection?.timesSeen || 0;
+  const relistingConfidence = listingBehavior?.relistingDetection?.confidence || 0;
+  const relistingHistory = listingBehavior?.relistingDetection?.personalBackupHistory || [];
+  
+  const hasPriceVolatility = pricingBehavior?.priceVolatility?.detected;
+  const volatilityLevel = pricingBehavior?.priceVolatility?.volatilityLevel;
+  const priceChanges = pricingBehavior?.priceVolatility?.priceChanges || 0;
+  const significantDrops = pricingBehavior?.priceVolatility?.significantDrops || [];
+  const oscillations = pricingBehavior?.priceVolatility?.oscillations || 0;
+  const priceHistory = pricingBehavior?.priceVolatility?.priceHistory || [];
+
+  return (
+    <div className="bg-white p-6 md:p-8 rounded-xl border border-gray-200 shadow-sm">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2.5 bg-purple-600/10 rounded-lg">
+          <Shield className="w-5 h-5 text-purple-600" />
+        </div>
+        <div>
+          <h3 className="text-xl font-semibold text-gray-900">Seller Signals</h3>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Patterns that may indicate increased risk
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        {/* Relisting Detection */}
+        {hasRelisting && (
+          <div className="border border-orange-200 rounded-lg p-4 bg-orange-50/50">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="p-2 bg-orange-100 rounded-lg">
+                <TrendingUp className="w-4 h-4 text-orange-600" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <h4 className="font-semibold text-gray-900">Relisting Detected</h4>
+                  <span className="text-xs font-medium text-orange-700 bg-orange-100 px-2 py-1 rounded">
+                    {relistingConfidence}% confidence
+                  </span>
+                </div>
+                <p className="text-sm text-gray-700 mb-3">
+                  This vehicle has been listed {relistingCount} time{relistingCount === 1 ? '' : 's'} in the last 90 days.
+                </p>
+                
+                {relistingHistory.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-orange-200">
+                    <p className="text-xs font-medium text-gray-700 mb-2">Listing History:</p>
+                    <ul className="space-y-1">
+                      {relistingHistory.map((entry, index) => (
+                        <li key={index} className="text-xs text-gray-600 flex items-start gap-2">
+                          <span className="text-orange-500 mt-1">•</span>
+                          <span>{entry}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                <div className="mt-3 pt-3 border-t border-orange-200">
+                  <p className="text-xs text-gray-600 italic">
+                    ⚠️ Frequent relisting may indicate issues discovered during previous buyer inspections. 
+                    Ask the seller why previous sales fell through.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Price Volatility */}
+        {hasPriceVolatility && (
+          <div className={`border rounded-lg p-4 ${
+            volatilityLevel === 'high' ? 'border-red-200 bg-red-50/50' :
+            volatilityLevel === 'medium' ? 'border-orange-200 bg-orange-50/50' :
+            'border-yellow-200 bg-yellow-50/50'
+          }`}>
+            <div className="flex items-start gap-3 mb-3">
+              <div className={`p-2 rounded-lg ${
+                volatilityLevel === 'high' ? 'bg-red-100' :
+                volatilityLevel === 'medium' ? 'bg-orange-100' :
+                'bg-yellow-100'
+              }`}>
+                <TrendingDown className={`w-4 h-4 ${
+                  volatilityLevel === 'high' ? 'text-red-600' :
+                  volatilityLevel === 'medium' ? 'text-orange-600' :
+                  'text-yellow-600'
+                }`} />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <h4 className="font-semibold text-gray-900">Price Volatility Detected</h4>
+                  <span className={`text-xs font-medium px-2 py-1 rounded ${
+                    volatilityLevel === 'high' ? 'text-red-700 bg-red-100' :
+                    volatilityLevel === 'medium' ? 'text-orange-700 bg-orange-100' :
+                    'text-yellow-700 bg-yellow-100'
+                  }`}>
+                    {volatilityLevel.toUpperCase()} risk
+                  </span>
+                </div>
+                <p className="text-sm text-gray-700 mb-3">
+                  {priceChanges} price change{priceChanges === 1 ? '' : 's'} detected in the last 90 days.
+                  {significantDrops.length > 0 && ` ${significantDrops.length} significant price drop${significantDrops.length === 1 ? '' : 's'} (5%+).`}
+                  {oscillations > 0 && ` Price has oscillated ${oscillations} time${oscillations === 1 ? '' : 's'} (drop then increase, or multiple drops).`}
+                </p>
+                
+                {significantDrops.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-xs font-medium text-gray-700 mb-2">Significant Price Drops:</p>
+                    <ul className="space-y-1">
+                      {significantDrops.map((drop, index) => (
+                        <li key={index} className="text-xs text-gray-600">
+                          <span className="font-semibold">${drop.fromPrice.toLocaleString()}</span>
+                          {' → '}
+                          <span className="font-semibold text-red-600">${drop.toPrice.toLocaleString()}</span>
+                          {' '}
+                          <span className="text-red-600">(-{drop.dropPercent}%)</span>
+                          {' '}
+                          <span className="text-gray-500">{drop.daysAgo} days ago</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {priceHistory.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-xs font-medium text-gray-700 mb-2">Price History:</p>
+                    <ul className="space-y-1">
+                      {priceHistory.slice(0, 5).map((entry, index) => (
+                        <li key={index} className="text-xs text-gray-600 flex items-start gap-2">
+                          <span className="text-gray-400 mt-1">•</span>
+                          <span>
+                            <span className="font-semibold">${entry.price.toLocaleString()}</span>
+                            {' on '}
+                            <span>{new Date(entry.date).toLocaleDateString('en-US', { 
+                              year: 'numeric', 
+                              month: 'short', 
+                              day: 'numeric' 
+                            })}</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <p className="text-xs text-gray-600 italic">
+                    ⚠️ Price volatility may indicate issues discovered during inspections or failed deals. 
+                    This is a behavioral risk signal, not proof of a problem.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Listing Longevity */}
+        {listingBehavior?.listingLongevity && (
+          <div className="border border-gray-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-gray-100 rounded-lg">
+                <AlertTriangle className="w-4 h-4 text-gray-600" />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-gray-900 mb-1">Listing Longevity</h4>
+                <p className="text-sm text-gray-700">
+                  Vehicle has been listed for {listingBehavior.listingLongevity.daysListed} days
+                  {listingBehavior.listingLongevity.isStale && ' - This is longer than typical for similar vehicles.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* No Signals Detected */}
+        {!hasRelisting && !hasPriceVolatility && !listingBehavior?.listingLongevity && (
+          <div className="border border-green-200 rounded-lg p-4 bg-green-50/50">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <UserCheck className="w-4 h-4 text-green-600" />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-gray-900 mb-1">No Significant Seller Signals Detected</h4>
+                <p className="text-sm text-gray-700">
+                  We did not detect any concerning patterns in how this vehicle is being sold.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Note about Seller Signals */}
+        <div className="pt-4 border-t border-gray-200">
+          <p className="text-xs text-gray-500">
+            <strong>Note:</strong> Seller signals detect patterns, not intent. They act as risk multipliers 
+            when combined with pricing, flood risk, or data gaps. They never alone trigger a "Disaster" verdict.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+

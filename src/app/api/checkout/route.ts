@@ -1,0 +1,61 @@
+import { NextRequest, NextResponse } from "next/server";
+import Stripe from "stripe";
+
+export async function POST(request: NextRequest) {
+  try {
+    // Check if Stripe secret key is configured
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    
+    if (!stripeSecretKey) {
+      console.error("STRIPE_SECRET_KEY is not set in environment variables");
+      return NextResponse.json(
+        { error: "Stripe is not configured. Please contact support." },
+        { status: 500 }
+      );
+    }
+
+    // Initialize Stripe client
+    const stripe = new Stripe(stripeSecretKey, {
+      apiVersion: "2024-12-18.acacia",
+      typescript: true,
+    });
+
+    // Parse request body
+    const body = await request.json();
+    const { reportId, amount = 2000, email } = body; // amount in cents ($20 = 2000 cents)
+
+    // Create Stripe checkout session
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: "Premium Vehicle Report",
+              description: "Complete vehicle history and detailed analysis",
+            },
+            unit_amount: amount, // $20 in cents
+          },
+          quantity: 1,
+        },
+      ],
+      mode: "payment", // One-time payment
+      success_url: `${request.nextUrl.origin}/success?session_id={CHECKOUT_SESSION_ID}&report_id=${reportId || "unknown"}`,
+      cancel_url: `${request.nextUrl.origin}?canceled=true`,
+      customer_email: email || undefined,
+      metadata: {
+        reportId: reportId || "unknown",
+      },
+    });
+
+    return NextResponse.json({ url: session.url });
+  } catch (error: any) {
+    console.error("Error creating checkout session:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to create checkout session" },
+      { status: 500 }
+    );
+  }
+}
+
