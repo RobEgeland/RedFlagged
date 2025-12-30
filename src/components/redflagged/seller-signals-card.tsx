@@ -27,6 +27,12 @@ export function SellerSignalsCard({
   const significantDrops = pricingBehavior?.priceVolatility?.significantDrops || [];
   const oscillations = pricingBehavior?.priceVolatility?.oscillations || 0;
   const priceHistory = pricingBehavior?.priceVolatility?.priceHistory || [];
+  
+  const hasUnusuallyLowPrice = pricingBehavior?.unusuallyLowPrice?.detected;
+  const unusuallyLowPrice = pricingBehavior?.unusuallyLowPrice;
+  
+  const hasTooGoodForTooLong = pricingBehavior?.tooGoodForTooLong?.detected;
+  const tooGoodForTooLong = pricingBehavior?.tooGoodForTooLong;
 
   return (
     <div className="bg-white p-6 md:p-8 rounded-xl border border-gray-200 shadow-sm">
@@ -174,6 +180,98 @@ export function SellerSignalsCard({
           </div>
         )}
 
+        {/* Unusually Low Price */}
+        {hasUnusuallyLowPrice && unusuallyLowPrice && (
+          <div className={`border rounded-lg p-4 ${
+            unusuallyLowPrice.belowMarketPercent <= -30 ? 'border-red-200 bg-red-50/50' :
+            unusuallyLowPrice.belowMarketPercent <= -20 ? 'border-orange-200 bg-orange-50/50' :
+            'border-yellow-200 bg-yellow-50/50'
+          }`}>
+            <div className="flex items-start gap-3 mb-3">
+              <div className={`p-2 rounded-lg ${
+                unusuallyLowPrice.belowMarketPercent <= -30 ? 'bg-red-100' :
+                unusuallyLowPrice.belowMarketPercent <= -20 ? 'bg-orange-100' :
+                'bg-yellow-100'
+              }`}>
+                <TrendingDown className={`w-4 h-4 ${
+                  unusuallyLowPrice.belowMarketPercent <= -30 ? 'text-red-600' :
+                  unusuallyLowPrice.belowMarketPercent <= -20 ? 'text-orange-600' :
+                  'text-yellow-600'
+                }`} />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <h4 className="font-semibold text-gray-900">Unusually Low Price</h4>
+                  <span className={`text-xs font-medium px-2 py-1 rounded ${
+                    unusuallyLowPrice.belowMarketPercent <= -30 ? 'text-red-700 bg-red-100' :
+                    unusuallyLowPrice.belowMarketPercent <= -20 ? 'text-orange-700 bg-orange-100' :
+                    'text-yellow-700 bg-yellow-100'
+                  }`}>
+                    {unusuallyLowPrice.confidence}% confidence
+                  </span>
+                </div>
+                <p className="text-sm text-gray-700 mb-3">
+                  Asking price is {Math.abs(unusuallyLowPrice.belowMarketPercent).toFixed(1)}% below market {unusuallyLowPrice.marketMedian ? 'median' : 'estimated value'}.
+                  This pricing anomaly warrants extra scrutiny but does not imply a defect.
+                </p>
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <p className="text-xs text-gray-600 italic">
+                    ⚠️ This is a probabilistic pricing behavior signal, not proof of seller intent or vehicle damage. 
+                    When combined with other risk signals (seller behavior, flood exposure, data gaps), it may indicate elevated risk.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Too Good for Too Long */}
+        {hasTooGoodForTooLong && tooGoodForTooLong && (
+          <div className={`border rounded-lg p-4 ${
+            (tooGoodForTooLong.daysListed - tooGoodForTooLong.thresholdDays) >= 30 ? 'border-red-200 bg-red-50/50' :
+            (tooGoodForTooLong.daysListed - tooGoodForTooLong.thresholdDays) >= 14 ? 'border-orange-200 bg-orange-50/50' :
+            'border-yellow-200 bg-yellow-50/50'
+          }`}>
+            <div className="flex items-start gap-3 mb-3">
+              <div className={`p-2 rounded-lg ${
+                (tooGoodForTooLong.daysListed - tooGoodForTooLong.thresholdDays) >= 30 ? 'bg-red-100' :
+                (tooGoodForTooLong.daysListed - tooGoodForTooLong.thresholdDays) >= 14 ? 'bg-orange-100' :
+                'bg-yellow-100'
+              }`}>
+                <AlertTriangle className={`w-4 h-4 ${
+                  (tooGoodForTooLong.daysListed - tooGoodForTooLong.thresholdDays) >= 30 ? 'text-red-600' :
+                  (tooGoodForTooLong.daysListed - tooGoodForTooLong.thresholdDays) >= 14 ? 'text-orange-600' :
+                  'text-yellow-600'
+                }`} />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <h4 className="font-semibold text-gray-900">Too Good for Too Long</h4>
+                  <span className={`text-xs font-medium px-2 py-1 rounded ${
+                    (tooGoodForTooLong.daysListed - tooGoodForTooLong.thresholdDays) >= 30 ? 'text-red-700 bg-red-100' :
+                    (tooGoodForTooLong.daysListed - tooGoodForTooLong.thresholdDays) >= 14 ? 'text-orange-700 bg-orange-100' :
+                    'text-yellow-700 bg-yellow-100'
+                  }`}>
+                    {tooGoodForTooLong.confidence}% confidence
+                  </span>
+                </div>
+                <p className="text-sm text-gray-700 mb-3">
+                  This unusually low-priced vehicle has been listed for {tooGoodForTooLong.daysListed} days, 
+                  exceeding the reasonable threshold of {tooGoodForTooLong.thresholdDays} days. 
+                  This may indicate possible market rejection.
+                </p>
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <p className="text-xs text-gray-600 italic">
+                    ⚠️ This signal only triggers when "Unusually Low Price" is also detected. 
+                    It is a probabilistic pricing behavior signal, not proof of seller intent or vehicle damage. 
+                    When combined with other risk signals, it may indicate elevated risk.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Listing Longevity */}
         {listingBehavior?.listingLongevity && (
           <div className="border border-gray-200 rounded-lg p-4">
@@ -193,7 +291,7 @@ export function SellerSignalsCard({
         )}
 
         {/* No Signals Detected */}
-        {!hasRelisting && !hasPriceVolatility && !listingBehavior?.listingLongevity && (
+        {!hasRelisting && !hasPriceVolatility && !hasUnusuallyLowPrice && !hasTooGoodForTooLong && !listingBehavior?.listingLongevity && (
           <div className="border border-green-200 rounded-lg p-4 bg-green-50/50">
             <div className="flex items-start gap-3">
               <div className="p-2 bg-green-100 rounded-lg">

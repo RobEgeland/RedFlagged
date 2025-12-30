@@ -2,7 +2,7 @@ import { VerdictResult, VerdictType, RedFlag, AnalysisRequest, AnalysisTier } fr
 import { fetchNMVTISData, fetchCarfaxAutoCheckData, generateHistorySummary } from './services/vehicle-history';
 import { fetchAllMarketData, calculateAverageMarketValue } from './services/market-listings';
 import { fetchAllDisasterData, analyzeDisasterRisk } from './services/disaster-geography';
-import { analyzeAllSellerSignals, calculateSellerCredibilityScore } from './services/seller-signals';
+import { analyzeAllSellerSignals, calculateSellerCredibilityScore, analyzeUnusuallyLowPrice, analyzeTooGoodForTooLong } from './services/seller-signals';
 import { fetchVehicleRecalls, VehicleRecall } from './services/vehicle-recalls';
 import { analyzeEnvironmentalRisk } from './services/environmental-risk';
 
@@ -151,6 +151,63 @@ function generateRedFlagsFromAllData(
       methodology: tier === 'paid' ? 'Compared against average retail prices from multiple market data sources.' : undefined,
       isPremium: tier === 'free',
       dataSource: tier === 'paid' ? 'Market Listings Data' : undefined
+    });
+  }
+  
+  // Pricing Risk Signals: "Unusually Low Price" and "Too Good for Too Long"
+  const pricingBehavior = sellerSignals?.pricingBehavior;
+  
+  // "Unusually Low Price" signal (independent of time on market)
+  if (pricingBehavior?.unusuallyLowPrice?.detected) {
+    const lowPrice = pricingBehavior.unusuallyLowPrice;
+    const belowPercent = Math.abs(lowPrice.belowMarketPercent);
+    
+    // Determine severity based on how far below market
+    let severity: 'low' | 'medium' | 'high' | 'critical' = 'medium';
+    if (belowPercent >= 30) {
+      severity = 'high';
+    } else if (belowPercent >= 20) {
+      severity = 'medium';
+    } else {
+      severity = 'low';
+    }
+    
+    flags.push({
+      id: 'unusually-low-price',
+      title: `Unusually Low Price (${belowPercent.toFixed(1)}% below market)`,
+      description: `This vehicle's asking price is meaningfully below expected valuation anchors or market medians for similar vehicles. This pricing anomaly warrants extra scrutiny but does not imply a defect.`,
+      severity,
+      category: 'pricing',
+      expandedDetails: `The asking price of $${lowPrice.askingPrice.toLocaleString()} is ${belowPercent.toFixed(1)}% below the market ${lowPrice.marketMedian ? 'median' : 'estimated value'} of $${((lowPrice.askingPrice / (1 + lowPrice.belowMarketPercent / 100))).toLocaleString()}. This is a probabilistic pricing behavior signal, not proof of seller intent or vehicle damage. When combined with other risk signals (seller behavior, flood exposure, data gaps), it may indicate elevated risk. Confidence: ${lowPrice.confidence}%.`,
+      methodology: `Compared asking price against market median and estimated value from multiple data sources. Threshold: ${lowPrice.thresholdUsed}% below market.`,
+      dataSource: 'Market Listings Data (Auto.dev, Edmunds, KBB, MarketCheck)'
+    });
+  }
+  
+  // "Too Good for Too Long" signal (only if "Unusually Low Price" is present)
+  if (pricingBehavior?.tooGoodForTooLong?.detected) {
+    const tooLong = pricingBehavior.tooGoodForTooLong;
+    
+    // Determine severity based on how long over threshold
+    let severity: 'low' | 'medium' | 'high' | 'critical' = 'medium';
+    const daysOver = tooLong.daysListed - tooLong.thresholdDays;
+    if (daysOver >= 30) {
+      severity = 'high';
+    } else if (daysOver >= 14) {
+      severity = 'medium';
+    } else {
+      severity = 'low';
+    }
+    
+    flags.push({
+      id: 'too-good-for-too-long',
+      title: `Too Good for Too Long (${tooLong.daysListed} days listed)`,
+      description: `This unusually low-priced vehicle has remained actively listed for ${tooLong.daysListed} days, exceeding the reasonable time threshold of ${tooLong.thresholdDays} days for ${tooLong.daysListed > tooLong.thresholdDays ? 'this vehicle class' : 'common vehicles'}. This may indicate possible market rejection.`,
+      severity,
+      category: 'pricing',
+      expandedDetails: `An unusually low-priced vehicle that remains listed for ${tooLong.daysListed} days (${daysOver} days beyond the ${tooLong.thresholdDays}-day threshold) may indicate market rejection. This is a probabilistic pricing behavior signal, not proof of seller intent or vehicle damage. When combined with other risk signals, it may indicate elevated risk. Confidence: ${tooLong.confidence}%.`,
+      methodology: `Evaluated listing duration against vehicle class-specific thresholds. This signal only triggers when "Unusually Low Price" is also detected.`,
+      dataSource: 'Auto.dev Listings API + Market Analysis'
     });
   }
   
@@ -516,16 +573,24 @@ function determineVerdict(flags: RedFlag[], priceDiffPercent: number): { verdict
   else if (priceDiffPercent < 0 && priceDiffPercent > -15) score += 5;
   
   // Determine verdict
-  // IMPORTANT: Environmental risk flags never alone cause "Disaster" verdict
+  // IMPORTANT: Environmental risk and pricing risk signals never alone cause "Disaster" verdict
   const hasOnlyEnvironmentalRisk = flags.length === 1 && flags.some(f => f.id === 'environmental-risk');
+  const hasOnlyPricingRisk = flags.length === 1 && (flags.some(f => f.id === 'unusually-low-price') || flags.some(f => f.id === 'too-good-for-too-long'));
+  const hasOnlyPricingRiskSignals = flags.every(f => f.id === 'unusually-low-price' || f.id === 'too-good-for-too-long');
+  
   const hasEnvironmentalRisk = flags.some(f => f.id === 'environmental-risk');
+  const hasPricingRisk = flags.some(f => f.id === 'unusually-low-price' || f.id === 'too-good-for-too-long');
   
   let verdict: VerdictType;
   if (score >= 70) verdict = 'deal';
   else if (score >= 45) verdict = 'caution';
   else {
-    // If only environmental risk, cap at "caution" - never "disaster"
-    verdict = hasOnlyEnvironmentalRisk ? 'caution' : 'disaster';
+    // If only environmental risk or only pricing risk signals, cap at "caution" - never "disaster"
+    if (hasOnlyEnvironmentalRisk || hasOnlyPricingRisk || hasOnlyPricingRiskSignals) {
+      verdict = 'caution';
+    } else {
+      verdict = 'disaster';
+    }
   }
   
   // Confidence based on data completeness
@@ -534,9 +599,12 @@ function determineVerdict(flags: RedFlag[], priceDiffPercent: number): { verdict
   if (hasNoVin) confidence -= 20;
   if (flags.some(f => f.id === 'title-state')) confidence -= 10;
   
-  // Environmental risk lowers confidence but doesn't cause disaster alone
+  // Environmental risk and pricing risk lower confidence but don't cause disaster alone
   if (hasEnvironmentalRisk) {
     confidence -= 5; // Small confidence reduction
+  }
+  if (hasPricingRisk) {
+    confidence -= 3; // Small confidence reduction for pricing risk
   }
   
   return { verdict, confidence: Math.max(40, Math.min(95, confidence)) };
@@ -736,8 +804,24 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
   
   // Calculate estimated value from market data
   let estimatedValue: number;
+  let marketMedian: number | undefined;
   if (marketData && Object.keys(marketData).length > 0) {
     estimatedValue = calculateAverageMarketValue(marketData);
+    
+    // Calculate market median from available market data sources
+    const marketValues: number[] = [];
+    if (marketData.autoDev?.marketAverage) marketValues.push(marketData.autoDev.marketAverage);
+    if (marketData.edmundsAPI) marketValues.push(marketData.edmundsAPI.trueMarketValue);
+    if (marketData.kelleyBlueBook) marketValues.push(marketData.kelleyBlueBook.fairPurchasePrice);
+    if (marketData.marketCheck) marketValues.push(marketData.marketCheck.competitivePrice);
+    
+    if (marketValues.length > 0) {
+      marketValues.sort((a, b) => a - b);
+      const mid = Math.floor(marketValues.length / 2);
+      marketMedian = marketValues.length % 2 === 0
+        ? (marketValues[mid - 1] + marketValues[mid]) / 2
+        : marketValues[mid];
+    }
   } else {
     // Fallback to legacy calculation
     estimatedValue = vehicleInfo.make && vehicleInfo.model && vehicleInfo.year
@@ -747,6 +831,45 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
   
   const priceDiff = request.askingPrice - estimatedValue;
   const priceDiffPercent = Math.round((priceDiff / estimatedValue) * 100);
+  
+  // Analyze pricing risk signals: "Unusually Low Price" and "Too Good for Too Long"
+  const unusuallyLowPrice = analyzeUnusuallyLowPrice(
+    request.askingPrice,
+    estimatedValue,
+    marketMedian
+  );
+  
+  // Get days listed from seller signals (if available)
+  const daysListed = sellerSignals?.listingBehavior?.listingLongevity?.daysListed ?? 0;
+  
+  // Determine vehicle class for "Too Good for Too Long" threshold
+  // Simple heuristic: luxury brands or high-value vehicles get longer thresholds
+  const isLuxury = vehicleInfo.make && ['BMW', 'Mercedes-Benz', 'Audi', 'Lexus', 'Porsche', 'Tesla', 'Jaguar', 'Land Rover', 'Bentley', 'Rolls-Royce', 'Maserati', 'Ferrari', 'Lamborghini'].includes(vehicleInfo.make);
+  const isExotic = estimatedValue > 100000; // Vehicles over $100k are considered exotic
+  const vehicleClass: 'common' | 'luxury' | 'exotic' = isExotic ? 'exotic' : isLuxury ? 'luxury' : 'common';
+  
+  const tooGoodForTooLong = analyzeTooGoodForTooLong(
+    daysListed,
+    unusuallyLowPrice?.detected ?? false,
+    vehicleClass
+  );
+  
+  // Add pricing risk signals to seller signals if they were detected
+  let updatedSellerSignals = sellerSignals;
+  if (unusuallyLowPrice || tooGoodForTooLong) {
+    updatedSellerSignals = {
+      ...(sellerSignals || {
+        listingBehavior: {},
+        pricingBehavior: {},
+        profileConsistency: {}
+      }),
+      pricingBehavior: {
+        ...(sellerSignals?.pricingBehavior || {}),
+        ...(unusuallyLowPrice ? { unusuallyLowPrice } : {}),
+        ...(tooGoodForTooLong ? { tooGoodForTooLong } : {})
+      }
+    };
+  }
   
   // Generate red flags with all data sources
   const redFlags = generateRedFlagsFromAllData(
@@ -761,7 +884,7 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
       vehicleHistory,
       disasterData,
       environmentalRisk,
-      sellerSignals,
+      sellerSignals: updatedSellerSignals,
       recalls: recalls || undefined
     },
     tier
@@ -882,7 +1005,7 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
     marketData: marketData || undefined,
     disasterData: disasterData || undefined,
     environmentalRisk: environmentalRisk || undefined,
-    sellerSignals: sellerSignals || undefined,
+    sellerSignals: updatedSellerSignals || undefined,
     recalls: recalls && recalls.length > 0 ? recalls : undefined
   };
   

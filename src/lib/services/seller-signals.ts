@@ -443,6 +443,142 @@ export async function analyzeListingBehavior(
 }
 
 /**
+ * Analyze "Unusually Low Price" signal
+ * Flags when asking price is meaningfully below expected valuation anchors or market medians
+ * Uses conservative, configurable thresholds
+ */
+export function analyzeUnusuallyLowPrice(
+  askingPrice: number,
+  estimatedValue: number,
+  marketMedian?: number,
+  config?: {
+    lowPriceThreshold?: number; // Percentage below market to flag (default: -15%)
+    highConfidenceThreshold?: number; // Percentage for high confidence (default: -25%)
+  }
+): PricingBehaviorSignals['unusuallyLowPrice'] {
+  try {
+    const threshold = config?.lowPriceThreshold ?? -15; // Default: 15% below market
+    const highConfidenceThreshold = config?.highConfidenceThreshold ?? -25; // Default: 25% below for high confidence
+    
+    // Use market median if available, otherwise use estimated value
+    const marketAnchor = marketMedian ?? estimatedValue;
+    
+    if (!marketAnchor || marketAnchor <= 0) {
+      return undefined;
+    }
+    
+    // Calculate percentage below market
+    const belowMarketPercent = ((askingPrice - marketAnchor) / marketAnchor) * 100;
+    
+    // Only flag if below the threshold (negative percentage)
+    if (belowMarketPercent >= threshold) {
+      return undefined; // Not unusually low
+    }
+    
+    // Calculate confidence based on how far below market
+    let confidence = 50; // Base confidence
+    if (belowMarketPercent <= highConfidenceThreshold) {
+      confidence = 85; // High confidence for very low prices
+    } else if (belowMarketPercent <= threshold * 1.5) {
+      confidence = 70; // Medium-high confidence
+    }
+    
+    // Increase confidence if we have market median (more reliable than estimated value)
+    if (marketMedian) {
+      confidence = Math.min(95, confidence + 10);
+    }
+    
+    console.log('[Pricing Risk] Unusually Low Price detected:', {
+      askingPrice,
+      marketAnchor,
+      belowMarketPercent: belowMarketPercent.toFixed(1) + '%',
+      confidence
+    });
+    
+    return {
+      detected: true,
+      belowMarketPercent: Math.round(belowMarketPercent * 10) / 10, // Round to 1 decimal
+      marketMedian: marketMedian,
+      askingPrice,
+      confidence: Math.round(confidence),
+      thresholdUsed: threshold
+    };
+  } catch (error) {
+    console.error('[Pricing Risk] Error analyzing unusually low price:', error);
+    return undefined;
+  }
+}
+
+/**
+ * Analyze "Too Good for Too Long" signal
+ * Only evaluated if "Unusually Low Price" is already detected
+ * Flags when unusually low-priced vehicle remains listed beyond reasonable time threshold
+ */
+export function analyzeTooGoodForTooLong(
+  daysListed: number,
+  hasUnusuallyLowPrice: boolean,
+  vehicleClass?: 'common' | 'luxury' | 'exotic', // Vehicle class affects threshold
+  config?: {
+    commonVehicleThreshold?: number; // Days for common vehicles (default: 21)
+    luxuryVehicleThreshold?: number; // Days for luxury vehicles (default: 30)
+    exoticVehicleThreshold?: number; // Days for exotic vehicles (default: 45)
+  }
+): PricingBehaviorSignals['tooGoodForTooLong'] {
+  try {
+    // Only evaluate if unusually low price is detected
+    if (!hasUnusuallyLowPrice) {
+      return undefined;
+    }
+    
+    // Determine threshold based on vehicle class
+    const classThresholds = {
+      common: config?.commonVehicleThreshold ?? 21, // 14-30 days range, using 21 as default
+      luxury: config?.luxuryVehicleThreshold ?? 30,
+      exotic: config?.exoticVehicleThreshold ?? 45
+    };
+    
+    const vehicleClassKey = vehicleClass ?? 'common';
+    const thresholdDays = classThresholds[vehicleClassKey];
+    
+    // Only flag if days listed exceeds threshold
+    if (daysListed <= thresholdDays) {
+      return undefined; // Not listed long enough to be suspicious
+    }
+    
+    // Calculate confidence based on how long it's been listed
+    let confidence = 50; // Base confidence
+    const daysOverThreshold = daysListed - thresholdDays;
+    
+    if (daysOverThreshold >= 30) {
+      confidence = 85; // High confidence if 30+ days over threshold
+    } else if (daysOverThreshold >= 14) {
+      confidence = 70; // Medium-high confidence if 14+ days over
+    } else {
+      confidence = 60; // Medium confidence if just over threshold
+    }
+    
+    console.log('[Pricing Risk] Too Good for Too Long detected:', {
+      daysListed,
+      thresholdDays,
+      daysOverThreshold,
+      confidence,
+      vehicleClass: vehicleClassKey
+    });
+    
+    return {
+      detected: true,
+      daysListed,
+      thresholdDays,
+      confidence: Math.round(confidence),
+      requiresLowPrice: true
+    };
+  } catch (error) {
+    console.error('[Pricing Risk] Error analyzing too good for too long:', error);
+    return undefined;
+  }
+}
+
+/**
  * Price history entry for volatility analysis
  */
 interface PriceHistoryEntry {

@@ -136,6 +136,21 @@ export interface PricingBehaviorSignals {
     oscillations?: number; // Number of price oscillations (drop then increase, or multiple drops)
     timeWindow: number; // Days analyzed (45 or 90)
   };
+  unusuallyLowPrice?: {
+    detected: boolean;
+    belowMarketPercent: number; // How much below market (e.g., -15 means 15% below)
+    marketMedian?: number;
+    askingPrice: number;
+    confidence: number; // 0-100
+    thresholdUsed: number; // The threshold that triggered this (e.g., -15%)
+  };
+  tooGoodForTooLong?: {
+    detected: boolean;
+    daysListed: number;
+    thresholdDays: number; // The threshold that was exceeded (e.g., 21 days)
+    confidence: number; // 0-100
+    requiresLowPrice: boolean; // Only true if unusuallyLowPrice was also detected
+  };
   tooGoodTooBeLong?: {
     isSuspicious: boolean;
     belowMarket: boolean;
