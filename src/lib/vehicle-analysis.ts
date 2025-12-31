@@ -77,15 +77,157 @@ function getEstimatedValue(make: string, model: string, year: number, mileage?: 
   return calculateDepreciation(baseValue, year, mileage);
 }
 
+// Helper function to extract state from location string
+function extractStateFromLocation(location?: string): string | null {
+  if (!location) return null;
+  
+  const stateMap: { [key: string]: string } = {
+    'ALABAMA': 'AL', 'ALASKA': 'AK', 'ARIZONA': 'AZ', 'ARKANSAS': 'AR', 'CALIFORNIA': 'CA',
+    'COLORADO': 'CO', 'CONNECTICUT': 'CT', 'DELAWARE': 'DE', 'FLORIDA': 'FL', 'GEORGIA': 'GA',
+    'HAWAII': 'HI', 'IDAHO': 'ID', 'ILLINOIS': 'IL', 'INDIANA': 'IN', 'IOWA': 'IA',
+    'KANSAS': 'KS', 'KENTUCKY': 'KY', 'LOUISIANA': 'LA', 'MAINE': 'ME', 'MARYLAND': 'MD',
+    'MASSACHUSETTS': 'MA', 'MICHIGAN': 'MI', 'MINNESOTA': 'MN', 'MISSISSIPPI': 'MS', 'MISSOURI': 'MO',
+    'MONTANA': 'MT', 'NEBRASKA': 'NE', 'NEVADA': 'NV', 'NEW HAMPSHIRE': 'NH', 'NEW JERSEY': 'NJ',
+    'NEW MEXICO': 'NM', 'NEW YORK': 'NY', 'NORTH CAROLINA': 'NC', 'NORTH DAKOTA': 'ND', 'OHIO': 'OH',
+    'OKLAHOMA': 'OK', 'OREGON': 'OR', 'PENNSYLVANIA': 'PA', 'RHODE ISLAND': 'RI', 'SOUTH CAROLINA': 'SC',
+    'SOUTH DAKOTA': 'SD', 'TENNESSEE': 'TN', 'TEXAS': 'TX', 'UTAH': 'UT', 'VERMONT': 'VT',
+    'VIRGINIA': 'VA', 'WASHINGTON': 'WA', 'WEST VIRGINIA': 'WV', 'WISCONSIN': 'WI', 'WYOMING': 'WY'
+  };
+
+  const upperLocation = location.toUpperCase();
+
+  // Try to find full state name
+  for (const fullName in stateMap) {
+    if (upperLocation.includes(fullName)) {
+      return stateMap[fullName];
+    }
+  }
+
+  // Fallback to abbreviations
+  const stateAbbreviations = Object.values(stateMap);
+  for (const abbr of stateAbbreviations) {
+    if (upperLocation.includes(abbr)) {
+      return abbr;
+    }
+  }
+
+  return null;
+}
+
+// Helper function to extract city from location string (simple extraction)
+function extractCityFromLocation(location?: string): string | null {
+  if (!location) return null;
+  
+  // Try to extract city name (usually first part before comma or state)
+  const parts = location.split(',').map(p => p.trim());
+  if (parts.length > 0 && parts[0]) {
+    return parts[0].toUpperCase();
+  }
+  
+  return null;
+}
+
+// Helper function to calculate location priority score
+// Higher score = closer match
+function calculateLocationPriority(
+  listingState: string | undefined,
+  listingCity: string | undefined,
+  targetState: string | null,
+  targetCity: string | null
+): number {
+  if (!targetState) return 0; // No target location, no priority
+  
+  // Exact state and city match = highest priority (100)
+  if (targetCity && listingCity && listingState === targetState) {
+    const listingCityUpper = listingCity.toUpperCase();
+    const targetCityUpper = targetCity.toUpperCase();
+    if (listingCityUpper === targetCityUpper || listingCityUpper.includes(targetCityUpper) || targetCityUpper.includes(listingCityUpper)) {
+      return 100;
+    }
+  }
+  
+  // Same state match = medium priority (50)
+  if (listingState === targetState) {
+    return 50;
+  }
+  
+  // Different state = low priority (0)
+  return 0;
+}
+
 // Helper function to generate comparable listings from market data
 function generateComparableListings(
   marketData: any,
   estimatedValue: number,
-  vehicleMileage?: number
+  vehicleMileage?: number,
+  targetLocation?: string
 ): Array<{ price: number; mileage: number; location: string; daysOnMarket: number; source?: string }> {
-  const listings: Array<{ price: number; mileage: number; location: string; daysOnMarket: number; source?: string }> = [];
+  const listings: Array<{ price: number; mileage: number; location: string; daysOnMarket: number; source?: string; priority?: number }> = [];
   
-  // Generate 3-5 comparable listings based on market data
+  // Extract target location info
+  const targetState = extractStateFromLocation(targetLocation);
+  const targetCity = extractCityFromLocation(targetLocation);
+  
+  // Use real listings from Auto.dev if available
+  if (marketData?.autoDev?.rawListings && marketData.autoDev.rawListings.length > 0) {
+    const rawListings = marketData.autoDev.rawListings;
+    
+    // Process and score listings by location proximity
+    for (const listing of rawListings) {
+      if (!listing.price || listing.price <= 0) continue;
+      
+      const locationParts: string[] = [];
+      if (listing.location?.city) locationParts.push(listing.location.city);
+      if (listing.location?.state) locationParts.push(listing.location.state);
+      const locationStr = locationParts.length > 0 
+        ? locationParts.join(', ')
+        : 'Location not specified';
+      
+      // Calculate location priority
+      const priority = calculateLocationPriority(
+        listing.location?.state,
+        listing.location?.city,
+        targetState,
+        targetCity
+      );
+      
+      listings.push({
+        price: listing.price || 0,
+        mileage: listing.mileage || 0,
+        location: locationStr,
+        daysOnMarket: Math.floor(Math.random() * 30) + 1,
+        source: listing.dealer ? 'Dealer Listing' : 'Private Party',
+        priority: priority
+      });
+    }
+    
+    // Sort by location priority (highest first), then by price
+    listings.sort((a, b) => {
+      // First sort by location priority (higher is better)
+      if (a.priority !== b.priority) {
+        return (b.priority || 0) - (a.priority || 0);
+      }
+      // If same priority, sort by price (lower is better for comparables)
+      return a.price - b.price;
+    });
+    
+    // Take up to 5 listings, prioritizing local ones
+    const selectedListings = listings.slice(0, 5).map(({ priority, ...rest }) => rest);
+    
+    console.log('[Comparable Listings] Generated from real Auto.dev data:', {
+      count: selectedListings.length,
+      targetLocation,
+      targetState,
+      targetCity,
+      listings: selectedListings.map(l => ({ price: l.price, mileage: l.mileage, location: l.location })),
+      localMatches: selectedListings.filter(l => l.location.includes(targetState || '')).length
+    });
+    
+    return selectedListings;
+  }
+  
+  // Fallback: Generate mock listings if no real data available
+  console.log('[Comparable Listings] No real listings available, generating mock data');
   const numListings = 3 + Math.floor(Math.random() * 3);
   const baseMileage = vehicleMileage || 50000;
   
@@ -98,7 +240,7 @@ function generateComparableListings(
       mileage: Math.round(baseMileage * mileageVariation),
       location: `${15 + Math.floor(Math.random() * 50)} miles away`,
       daysOnMarket: 5 + Math.floor(Math.random() * 35),
-      source: ['Auto Trader', 'Cars.com', 'CarGurus', 'Facebook Marketplace'][Math.floor(Math.random() * 4)]
+      source: 'Market Estimate'
     });
   }
   
@@ -1185,7 +1327,7 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
     
     // Comparable listings from market data
     if (marketData) {
-      result.comparableListings = generateComparableListings(marketData, estimatedValue, vehicleInfo.mileage);
+      result.comparableListings = generateComparableListings(marketData, estimatedValue, vehicleInfo.mileage, request.location);
     }
     
     // Market pricing analysis (detailed pricing context)

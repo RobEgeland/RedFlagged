@@ -280,6 +280,15 @@ export function AnalysisResults({ result, onReset }: AnalysisResultsProps) {
       )}
 
       {/* Comparable Listings - Paid Only */}
+      {(() => {
+        console.log('[Client] Comparable Listings Debug:', {
+          isFree,
+          tier: result.tier,
+          hasComparableListings: !!result.comparableListings,
+          comparableListingsCount: result.comparableListings?.length || 0
+        });
+        return null;
+      })()}
       {!isFree && result.comparableListings && result.comparableListings.length > 0 && (
         <div className="bg-white p-6 md:p-8 rounded-xl border border-gray-200 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
@@ -338,7 +347,18 @@ export function AnalysisResults({ result, onReset }: AnalysisResultsProps) {
       )}
 
       {/* Market Pricing Analysis - Paid Only */}
-      {!isFree && result.marketPricingAnalysis && result.vehicleInfo.askingPrice && (
+      {(() => {
+        console.log('[Client] Market Pricing Analysis Debug:', {
+          isFree,
+          tier: result.tier,
+          hasAnalysis: !!result.marketPricingAnalysis,
+          hasAskingPrice: !!result.vehicleInfo?.askingPrice,
+          askingPrice: result.vehicleInfo?.askingPrice,
+          hasMarketData: !!result.marketData
+        });
+        return null;
+      })()}
+      {!isFree && result.marketPricingAnalysis && result.vehicleInfo?.askingPrice && (
         <MarketPricingAnalysisCard 
           analysis={result.marketPricingAnalysis} 
           askingPrice={result.vehicleInfo.askingPrice}

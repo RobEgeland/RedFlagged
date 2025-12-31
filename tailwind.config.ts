@@ -31,6 +31,8 @@ const config = {
   			deal: '#1E5A3A',
   			caution: '#D97706',
   			disaster: '#B91C1C',
+  			charcoal: '#1F2937',
+  			cream: '#F9FAFB',
   			primary: {
   				DEFAULT: 'hsl(var(--primary))',
   				foreground: 'hsl(var(--primary-foreground))'

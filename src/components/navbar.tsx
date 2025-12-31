@@ -11,21 +11,32 @@ export default function Navbar() {
 
 
   return (
-    <nav className="w-full border-b border-charcoal/10 bg-cream/80 backdrop-blur-sm py-3 sticky top-0 z-50">
+    <nav className="w-full border-b border-slate-200/80 bg-white/90 backdrop-blur-md py-4 sticky top-0 z-50">
       <div className="container mx-auto px-4 flex justify-between items-center">
-        <Link href="/" prefetch className="flex items-center gap-2 group">
-          <div className="p-1.5 bg-disaster rounded">
-            <Flag className="w-4 h-4 text-cream" />
+        <Link href="/" prefetch className="flex items-center gap-2.5 group">
+          <div className="p-1.5 bg-slate-900 rounded-lg">
+            <Flag className="w-4 h-4 text-white" />
           </div>
-          <span className="font-display text-xl font-bold text-charcoal tracking-tight">
+          <span className="text-xl font-bold text-slate-900 tracking-tight">
             RedFlagged
           </span>
         </Link>
+
+        {/* Center navigation links */}
+        <div className="hidden md:flex items-center gap-8">
+          <a href="#analyze" className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors">
+            Analyze
+          </a>
+          <a href="#pricing" className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors">
+            Pricing
+          </a>
+        </div>
+
         <div className="flex gap-3 items-center">
           {isSignedIn ? (
             <>
               <Link href="/dashboard">
-                <Button className="bg-charcoal hover:bg-charcoal/90 text-cream font-medium">
+                <Button className="bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-lg">
                   Dashboard
                 </Button>
               </Link>
@@ -35,15 +46,15 @@ export default function Navbar() {
             <>
               <Link
                 href="/sign-in"
-                className="px-4 py-2 text-sm font-medium text-charcoal hover:text-charcoal/80 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
               >
                 Sign In
               </Link>
               <Link
                 href="/sign-up"
-                className="px-4 py-2 text-sm font-medium text-cream bg-charcoal rounded-md hover:bg-charcoal/90 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors"
               >
-                Sign Up
+                Get Started
               </Link>
             </>
           )}

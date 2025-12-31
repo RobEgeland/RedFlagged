@@ -9,8 +9,19 @@ import {
   MessageSquare,
   Eye,
   CheckCircle2,
-  FileQuestion,
-  Zap
+  ArrowRight,
+  Car,
+  Search,
+  FileCheck,
+  TrendingUp,
+  MapPin,
+  Wrench,
+  Clock,
+  Users,
+  BadgeCheck,
+  CircleSlash,
+  BarChart3,
+  ChevronDown
 } from 'lucide-react';
 
 export default async function Home() {
@@ -20,14 +31,17 @@ export default async function Home() {
       <Hero />
 
       {/* Vehicle Analyzer Section */}
-      <section className="py-16 md:py-24" id="analyze">
+      <section className="py-16 md:py-24 bg-slate-50" id="analyze">
         <div className="container mx-auto px-4">
           <div className="text-center mb-10">
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-charcoal mb-3">
-              Analyze Your Deal
+            <span className="inline-block px-3 py-1 bg-slate-200 text-slate-600 text-sm font-medium rounded-full mb-4">
+              Try It Free
+            </span>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">
+              Check Any Vehicle Instantly
             </h2>
-            <p className="text-charcoal/60 max-w-xl mx-auto">
-              Enter a VIN or vehicle details to get an instant verdict on whether this deal is worth pursuing.
+            <p className="text-slate-500 max-w-xl mx-auto">
+              Enter a VIN or vehicle details below. Get your verdict in seconds—no signup required.
             </p>
           </div>
           
@@ -35,108 +49,273 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* How It Works Section */}
-      <section className="py-16 md:py-24 bg-card">
+      {/* Problem-Agitation-Solution Section */}
+      <section className="py-20 md:py-28 bg-white">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-charcoal mb-3">
-              How RedFlagged Works
+          <div className="max-w-4xl mx-auto">
+            {/* Problem */}
+            <div className="text-center mb-16">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-50 text-disaster text-sm font-medium rounded-full mb-6">
+                <AlertTriangle className="w-4 h-4" />
+                The Problem
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-6">
+                Buying a used car privately is risky
+              </h2>
+              <p className="text-lg text-slate-600 leading-relaxed max-w-2xl mx-auto">
+                Traditional history reports give you data—but not answers. You&apos;re left staring at pages of information, 
+                wondering: &ldquo;Is this actually a problem? Should I walk away?&rdquo;
+              </p>
+            </div>
+
+            {/* Agitation - Pain Points */}
+            <div className="grid md:grid-cols-3 gap-6 mb-16">
+              {[
+                { 
+                  icon: DollarSign,
+                  title: "Overpriced deals",
+                  description: "No easy way to know if you're paying thousands more than you should"
+                },
+                { 
+                  icon: Eye,
+                  title: "Hidden history",
+                  description: "Salvage titles, floods, and accidents that sellers conveniently forget to mention"
+                },
+                { 
+                  icon: Users,
+                  title: "Seller games",
+                  description: "Relisted cars, suspicious pricing, and deals that seem too good to be true"
+                },
+              ].map((pain, index) => (
+                <div key={index} className="p-6 bg-red-50/50 rounded-xl border border-red-100">
+                  <div className="p-2 bg-red-100 rounded-lg inline-block mb-4">
+                    <pain.icon className="w-5 h-5 text-disaster" />
+                  </div>
+                  <h3 className="font-semibold text-slate-900 mb-2">{pain.title}</h3>
+                  <p className="text-slate-500 text-sm">{pain.description}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Solution */}
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-50 text-deal text-sm font-medium rounded-full mb-6">
+                <CheckCircle2 className="w-4 h-4" />
+                The Solution
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-6">
+                A clear verdict—not another report to interpret
+              </h2>
+              <p className="text-lg text-slate-600 leading-relaxed max-w-2xl mx-auto">
+                RedFlagged analyzes the listing and tells you exactly what to do: <span className="font-semibold text-deal">pursue it</span>, 
+                <span className="font-semibold text-caution"> ask questions first</span>, or <span className="font-semibold text-disaster">walk away</span>. 
+                You get the answer in 3 seconds.
+              </p>
+            </div>
+
+            {/* Solution Visual - Signal Stack */}
+            <div className="bg-slate-50 rounded-2xl p-8 md:p-10 border border-slate-200">
+              <div className="grid md:grid-cols-2 gap-8 items-center">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900 mb-4">What we analyze</h3>
+                  <div className="space-y-3">
+                    {[
+                      { icon: DollarSign, label: "Price vs. real market data", color: "text-deal" },
+                      { icon: FileCheck, label: "Title history & brand checks", color: "text-slate-700" },
+                      { icon: TrendingUp, label: "Seller pricing behavior", color: "text-caution" },
+                      { icon: MapPin, label: "Disaster zone exposure", color: "text-slate-700" },
+                      { icon: Wrench, label: "Maintenance risk prediction", color: "text-slate-700" },
+                      { icon: MessageSquare, label: "Custom questions for you to ask", color: "text-slate-700" },
+                    ].map((item, index) => (
+                      <div key={index} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-100">
+                        <item.icon className={`w-5 h-5 ${item.color}`} />
+                        <span className="text-slate-700 text-sm font-medium">{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex justify-center">
+                  <div className="relative">
+                    {/* Confidence Meter Visualization */}
+                    <div className="w-48 h-48 rounded-full bg-gradient-to-b from-slate-100 to-slate-200 flex items-center justify-center shadow-inner">
+                      <div className="text-center">
+                        <div className="text-5xl font-bold text-deal mb-1">87%</div>
+                        <div className="text-sm text-slate-500 font-medium">Confidence</div>
+                      </div>
+                    </div>
+                    <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-deal text-white rounded-full text-sm font-bold shadow-lg">
+                      DEAL
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section className="py-20 md:py-28 bg-slate-900 text-white">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl md:text-4xl font-bold mb-3">
+              How It Works
             </h2>
-            <p className="text-charcoal/60 max-w-xl mx-auto">
-              We do the heavy lifting so you can make confident decisions.
+            <p className="text-slate-400 max-w-xl mx-auto">
+              Three steps. Ten seconds. One clear answer.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {[
               { 
-                step: "01", 
-                icon: FileQuestion,
-                title: "Enter Vehicle Info", 
-                description: "Provide the VIN or basic details (year, make, model) plus the asking price." 
+                step: "1", 
+                icon: Car,
+                title: "Enter the vehicle", 
+                description: "Paste the VIN, or enter year, make, model, and asking price manually." 
               },
               { 
-                step: "02", 
-                icon: Zap,
-                title: "Instant Analysis", 
-                description: "We analyze pricing data, history patterns, and risk factors in seconds." 
+                step: "2", 
+                icon: Search,
+                title: "We analyze everything", 
+                description: "Market pricing, history signals, seller behavior, disaster exposure—all checked instantly." 
               },
               { 
-                step: "03", 
-                icon: Shield,
-                title: "Get Your Verdict", 
-                description: "Receive a clear Deal, Caution, or Disaster verdict with actionable insights." 
+                step: "3", 
+                icon: BadgeCheck,
+                title: "Get your verdict", 
+                description: "Deal, Caution, or Disaster—plus the specific red flags and questions you need." 
               },
             ].map((item, index) => (
-              <div key={index} className="relative p-6 bg-background rounded-lg border border-charcoal/10 card-hover">
-                <span className="font-mono text-4xl font-bold text-charcoal/10 absolute top-4 right-4">
-                  {item.step}
-                </span>
-                <div className="p-3 bg-charcoal/5 rounded-lg inline-block mb-4">
-                  <item.icon className="w-6 h-6 text-charcoal" />
+              <div key={index} className="relative">
+                <div className="p-6 bg-slate-800/50 rounded-xl border border-slate-700">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
+                      <span className="font-mono text-lg font-bold text-white">{item.step}</span>
+                    </div>
+                    <item.icon className="w-6 h-6 text-slate-400" />
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-2">{item.title}</h3>
+                  <p className="text-slate-400 text-sm leading-relaxed">{item.description}</p>
                 </div>
-                <h3 className="font-display text-xl font-bold text-charcoal mb-2">{item.title}</h3>
-                <p className="text-charcoal/60 text-sm leading-relaxed">{item.description}</p>
+                {index < 2 && (
+                  <div className="hidden md:block absolute top-1/2 -right-4 transform -translate-y-1/2">
+                    <ArrowRight className="w-8 h-8 text-slate-700" />
+                  </div>
+                )}
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* What We Check Section */}
-      <section className="py-16 md:py-24">
+      {/* What Makes Us Different Section */}
+      <section className="py-20 md:py-28 bg-white">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-charcoal mb-3">
-              What We Check
-            </h2>
-            <p className="text-charcoal/60 max-w-xl mx-auto">
-              RedFlagged goes beyond traditional history reports to catch what others miss.
-            </p>
-          </div>
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-14">
+              <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">
+                Not Another History Report
+              </h2>
+              <p className="text-slate-500 max-w-2xl mx-auto">
+                Traditional reports give you data to decipher. We give you a decision.
+              </p>
+            </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-            {[
-              { icon: DollarSign, title: "Price vs. Market", description: "Is it overpriced, fairly priced, or suspiciously cheap?" },
-              { icon: AlertTriangle, title: "Hidden Red Flags", description: "Data gaps, suspicious relisting, and private-sale risks" },
-              { icon: Eye, title: "Title & History", description: "Title brands, accident indicators, and ownership patterns" },
-              { icon: MessageSquare, title: "Seller Questions", description: "Specific questions to ask based on detected flags" },
-            ].map((feature, index) => (
-              <div key={index} className="p-5 bg-card rounded-lg border border-charcoal/10 card-hover">
-                <div className="p-2 bg-charcoal/5 rounded inline-block mb-3">
-                  <feature.icon className="w-5 h-5 text-charcoal" />
+            <div className="grid md:grid-cols-2 gap-8">
+              {/* Traditional Reports */}
+              <div className="p-8 bg-slate-50 rounded-2xl border border-slate-200">
+                <div className="flex items-center gap-3 mb-6">
+                  <CircleSlash className="w-6 h-6 text-slate-400" />
+                  <h3 className="text-lg font-bold text-slate-500">Traditional history reports</h3>
                 </div>
-                <h3 className="font-display text-lg font-bold text-charcoal mb-1">{feature.title}</h3>
-                <p className="text-charcoal/60 text-sm">{feature.description}</p>
+                <ul className="space-y-4">
+                  {[
+                    "Pages of raw data without interpretation",
+                    "No pricing analysis or market context",
+                    "Can't detect suspicious seller behavior",
+                    "No questions to ask—you're on your own",
+                    "Recurring subscription fees",
+                  ].map((item, index) => (
+                    <li key={index} className="flex items-start gap-3 text-slate-500 text-sm">
+                      <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-slate-400 text-xs">✕</span>
+                      </div>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            ))}
+
+              {/* RedFlagged */}
+              <div className="p-8 bg-slate-900 rounded-2xl text-white">
+                <div className="flex items-center gap-3 mb-6">
+                  <Shield className="w-6 h-6 text-deal" />
+                  <h3 className="text-lg font-bold">RedFlagged</h3>
+                </div>
+                <ul className="space-y-4">
+                  {[
+                    "Clear verdict: Deal, Caution, or Disaster",
+                    "Real-time market pricing comparison",
+                    "Seller behavior & relisting detection",
+                    "Custom questions based on detected flags",
+                    "One-time payment—no subscriptions",
+                  ].map((item, index) => (
+                    <li key={index} className="flex items-start gap-3 text-slate-200 text-sm">
+                      <div className="w-5 h-5 rounded-full bg-deal flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <CheckCircle2 className="w-3 h-3 text-white" />
+                      </div>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Trust Section */}
-      <section className="py-16 md:py-24 bg-charcoal text-cream relative overflow-hidden">
-        {/* Noise texture */}
-        <div className="absolute inset-0 noise-texture pointer-events-none" />
-        
-        <div className="container mx-auto px-4 relative z-10">
+      {/* Trust & Transparency Section */}
+      <section className="py-20 md:py-28 bg-slate-50">
+        <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
-            <h2 className="font-display text-3xl md:text-4xl font-bold mb-6">
-              Transparency Over Perfection
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-slate-200 text-slate-600 text-sm font-medium rounded-full mb-6">
+              <Eye className="w-4 h-4" />
+              Our Philosophy
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-6">
+              Transparency over perfection
             </h2>
-            <p className="text-xl text-cream/80 mb-8 leading-relaxed">
+            <p className="text-lg text-slate-600 mb-12 leading-relaxed max-w-2xl mx-auto">
               We believe a report that says &ldquo;We couldn&apos;t verify this&rdquo; is more trustworthy than one that pretends to know everything. 
-              That&apos;s why every RedFlagged analysis clearly shows what we know, what we don&apos;t, and how those gaps affect our confidence.
+              Every RedFlagged analysis shows exactly what we know, what we don&apos;t, and how that affects our confidence.
             </p>
+
+            {/* Trust Signals */}
             <div className="grid md:grid-cols-3 gap-6">
               {[
-                { stat: "Free", label: "Basic verdict & flags" },
-                { stat: "$20", label: "One-time premium report" },
-                { stat: "0", label: "Recurring fees or subscriptions" },
+                { 
+                  icon: BarChart3,
+                  title: "Confidence-scored",
+                  description: "Every verdict includes a confidence percentage based on data availability"
+                },
+                { 
+                  icon: Eye,
+                  title: "Limitations disclosed",
+                  description: "We clearly state what data sources we checked and what we couldn't verify"
+                },
+                { 
+                  icon: MessageSquare,
+                  title: "Conservative language",
+                  description: "No alarmist claims—just factual analysis and practical next steps"
+                },
               ].map((item, index) => (
-                <div key={index} className="p-4">
-                  <div className="font-mono text-3xl md:text-4xl font-bold text-caution mb-1">{item.stat}</div>
-                  <div className="text-sm text-cream/60">{item.label}</div>
+                <div key={index} className="p-6 bg-white rounded-xl border border-slate-200">
+                  <div className="p-3 bg-slate-100 rounded-lg inline-block mb-4">
+                    <item.icon className="w-5 h-5 text-slate-700" />
+                  </div>
+                  <h3 className="font-semibold text-slate-900 mb-2">{item.title}</h3>
+                  <p className="text-slate-500 text-sm">{item.description}</p>
                 </div>
               ))}
             </div>
@@ -144,92 +323,119 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Premium Features Section */}
-      <section className="py-16 md:py-24 bg-card" id="pricing">
+      {/* Pricing Section */}
+      <section className="py-20 md:py-28 bg-white" id="pricing">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
-              <h2 className="font-display text-3xl md:text-4xl font-bold text-charcoal mb-3">
-                Free vs. Premium
+              <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">
+                Simple, Honest Pricing
               </h2>
-              <p className="text-charcoal/60 max-w-xl mx-auto">
-                The free analysis gives you the essentials. Premium unlocks the full picture.
+              <p className="text-slate-500 max-w-xl mx-auto">
+                Start free. Upgrade only if you want the full deep-dive.
               </p>
             </div>
 
             <div className="grid md:grid-cols-2 gap-8">
               {/* Free Tier */}
-              <div className="p-6 md:p-8 bg-background rounded-lg border border-charcoal/20">
-                <div className="text-center mb-6">
-                  <h3 className="font-display text-2xl font-bold text-charcoal mb-1">Free</h3>
-                  <p className="text-charcoal/60 text-sm">Build trust before you buy</p>
+              <div className="p-8 bg-white rounded-2xl border-2 border-slate-200">
+                <div className="mb-6">
+                  <h3 className="text-2xl font-bold text-slate-900 mb-1">Free Analysis</h3>
+                  <p className="text-slate-500 text-sm">Perfect for initial screening</p>
                 </div>
-                <ul className="space-y-3">
+                <div className="mb-8">
+                  <span className="text-4xl font-bold text-slate-900">$0</span>
+                  <span className="text-slate-400 ml-1">forever</span>
+                </div>
+                <ul className="space-y-4 mb-8">
                   {[
                     "Deal / Caution / Disaster verdict",
                     "Price vs. market comparison",
                     "Top red flags identified",
                     "5 questions to ask the seller",
-                    "Transparency disclosure",
+                    "Data quality transparency",
                   ].map((item, index) => (
-                    <li key={index} className="flex items-start gap-2 text-charcoal/80 text-sm">
-                      <CheckCircle2 className="w-4 h-4 text-deal flex-shrink-0 mt-0.5" />
+                    <li key={index} className="flex items-start gap-3 text-slate-700 text-sm">
+                      <CheckCircle2 className="w-5 h-5 text-deal flex-shrink-0" />
                       <span>{item}</span>
                     </li>
                   ))}
                 </ul>
+                <a 
+                  href="#analyze" 
+                  className="block w-full py-3 px-4 text-center bg-slate-100 text-slate-700 rounded-xl font-semibold hover:bg-slate-200 transition-colors"
+                >
+                  Try Free Analysis
+                </a>
               </div>
 
               {/* Premium Tier */}
-              <div className="p-6 md:p-8 bg-charcoal rounded-lg text-cream relative overflow-hidden">
-                <div className="absolute top-0 right-0 px-3 py-1 bg-caution text-cream text-xs font-bold">
-                  ONE-TIME
+              <div className="p-8 bg-slate-900 rounded-2xl text-white relative overflow-hidden">
+                <div className="absolute top-4 right-4">
+                  <span className="px-3 py-1 bg-caution text-white text-xs font-bold rounded-full">ONE-TIME</span>
                 </div>
-                <div className="text-center mb-6">
-                  <h3 className="font-display text-2xl font-bold mb-1">Premium</h3>
-                  <div className="flex items-baseline justify-center gap-1">
-                    <span className="font-mono text-4xl font-bold">$20</span>
-                    <span className="text-cream/60 text-sm">one-time</span>
-                  </div>
+                <div className="mb-6">
+                  <h3 className="text-2xl font-bold mb-1">Premium Report</h3>
+                  <p className="text-slate-400 text-sm">Complete analysis for serious buyers</p>
                 </div>
-                <ul className="space-y-3">
+                <div className="mb-8">
+                  <span className="text-4xl font-bold">$20</span>
+                  <span className="text-slate-400 ml-1">one-time</span>
+                </div>
+                <ul className="space-y-4 mb-8">
                   {[
                     "Everything in Free, plus:",
                     "Complete vehicle history deep-dive",
-                    "Accident & title risk signals",
-                    "Flood & lemon indicators",
-                    "Ownership pattern analysis",
-                    "Detailed market comparables",
+                    "Seller signal analysis (relisting, pricing patterns)",
+                    "Environmental risk assessment",
+                    "Maintenance risk prediction",
+                    "Unlimited tailored questions",
                     "30-day shareable report link",
-                    "PDF download for your records",
                   ].map((item, index) => (
-                    <li key={index} className="flex items-start gap-2 text-cream/90 text-sm">
-                      <CheckCircle2 className="w-4 h-4 text-caution flex-shrink-0 mt-0.5" />
+                    <li key={index} className="flex items-start gap-3 text-slate-200 text-sm">
+                      <CheckCircle2 className="w-5 h-5 text-caution flex-shrink-0" />
                       <span>{item}</span>
                     </li>
                   ))}
                 </ul>
+                <a 
+                  href="#analyze" 
+                  className="block w-full py-3 px-4 text-center bg-white text-slate-900 rounded-xl font-semibold hover:bg-slate-100 transition-colors"
+                >
+                  Get Premium Report
+                </a>
               </div>
+            </div>
+
+            {/* No subscription note */}
+            <div className="text-center mt-8">
+              <p className="text-slate-400 text-sm">
+                No subscriptions. No recurring fees. Pay once, get your report.
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-16 md:py-24">
+      {/* Final CTA Section */}
+      <section className="py-20 md:py-28 bg-slate-900">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="font-display text-3xl md:text-4xl font-bold text-charcoal mb-4">
-            Ready to make smarter car decisions?
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+            Stop wondering. Start knowing.
           </h2>
-          <p className="text-charcoal/60 mb-8 max-w-2xl mx-auto">
-            Stop second-guessing yourself. Get clarity on any private-party used car deal in seconds.
+          <p className="text-slate-400 mb-10 max-w-2xl mx-auto text-lg">
+            Every hour you spend second-guessing is an hour closer to someone else buying your car—or worse, you buying a lemon.
           </p>
           <a 
             href="#analyze" 
-            className="inline-flex items-center px-8 py-4 text-cream bg-charcoal rounded-lg hover:bg-charcoal/90 transition-all hover:scale-[1.02] font-display font-bold text-lg"
+            className="inline-flex items-center gap-3 px-10 py-5 bg-white text-slate-900 rounded-xl hover:bg-slate-100 transition-all hover:scale-[1.02] font-bold text-lg shadow-lg"
           >
-            Analyze a Deal Now
+            Is This Car Worth It?
+            <ChevronDown className="w-5 h-5" />
           </a>
+          <div className="mt-6 text-slate-500 text-sm">
+            Free instant analysis • No signup required
+          </div>
         </div>
       </section>
 

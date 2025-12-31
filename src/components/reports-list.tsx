@@ -191,9 +191,8 @@ export function ReportsList({ userId }: ReportsListProps) {
           ? `${report.vehicle_info.year || ''} ${report.vehicle_info.make} ${report.vehicle_info.model}`.trim()
           : report.vehicle_info.vin || "Unknown Vehicle";
 
-        // Encode report data for viewing
-        const reportData = btoa(encodeURIComponent(JSON.stringify(report.report_data)));
-        const viewUrl = `/report?data=${reportData}`;
+        // Use database ID instead of encoding full data (prevents 431 errors for large reports)
+        const viewUrl = `/report?id=${report.id}`;
 
         return (
           <div
