@@ -209,3 +209,4 @@ export function MaintenanceRiskCard({ assessment }: MaintenanceRiskCardProps) {
   );
 }
 
+

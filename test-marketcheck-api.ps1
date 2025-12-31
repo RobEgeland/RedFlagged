@@ -43,3 +43,4 @@ try {
 Write-Host ""
 Write-Host "Check your Next.js server console for detailed logs!" -ForegroundColor Cyan
 
+

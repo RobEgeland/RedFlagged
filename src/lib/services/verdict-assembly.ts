@@ -1,12 +1,12 @@
-import { RedFlag, VerdictType, DataQualityAssessment } from '@/types/vehicle';
+import { RedFlag, VerdictType, DataQualityAssessment, VerdictResult } from '@/types/vehicle';
 
 /**
  * Verdict Assembly System
  * 
  * Combines multiple risk signals into one clear outcome: Deal, Caution, or Disaster.
  * Signals are grouped into:
- * - Structural risks (flood/disaster, serious safety issues)
- * - Market risks (pricing anomalies, volatility, weak comparables)
+ * - Structural risks (flood/disaster, serious safety issues, maintenance concerns)
+ * - Market risks (pricing anomalies, volatility, weak comparables, poor market position)
  * - Seller behavior risks (relisting patterns, low-price persistence)
  * 
  * Principles:
@@ -15,6 +15,7 @@ import { RedFlag, VerdictType, DataQualityAssessment } from '@/types/vehicle';
  * - Caution for moderate risks, multiple weaker signals, or limited data
  * - Deal only when no meaningful risks + medium/high confidence
  * - Data quality acts as modifier (low confidence prevents Deal, softens conclusions)
+ * - Premium features (maintenance risk, market pricing analysis) provide additional context
  */
 
 export interface VerdictReasoning {
@@ -25,6 +26,11 @@ export interface VerdictReasoning {
   marketRisks: RedFlag[];
   sellerBehaviorRisks: RedFlag[];
   dataQualityImpact: 'none' | 'softening' | 'preventing-deal';
+  contributingFactors?: {
+    maintenanceRisk?: 'low' | 'medium' | 'elevated';
+    marketPosition?: 'favorable' | 'neutral' | 'unfavorable';
+    environmentalRisk?: 'low' | 'medium' | 'high';
+  };
 }
 
 /**
@@ -138,13 +144,71 @@ function assessDataQualityImpact(
 }
 
 /**
- * Assemble verdict from categorized risk signals
+ * Assess maintenance risk contribution to verdict
+ */
+function assessMaintenanceRiskContribution(
+  maintenanceRisk?: VerdictResult['maintenanceRiskAssessment']
+): 'low' | 'medium' | 'elevated' | null {
+  if (!maintenanceRisk) return null;
+  return maintenanceRisk.overallRisk;
+}
+
+/**
+ * Assess market pricing position contribution to verdict
+ */
+function assessMarketPositionContribution(
+  marketPricing?: VerdictResult['marketPricingAnalysis']
+): 'favorable' | 'neutral' | 'unfavorable' | null {
+  if (!marketPricing) return null;
+  
+  // Unfavorable: high percentile (overpriced) with weak negotiation leverage
+  if (marketPricing.percentilePosition && marketPricing.negotiationLeverage) {
+    if (marketPricing.percentilePosition >= 75 && marketPricing.negotiationLeverage === 'weak') {
+      return 'unfavorable';
+    }
+    if (marketPricing.percentilePosition <= 25 && marketPricing.negotiationLeverage === 'strong') {
+      return 'favorable';
+    }
+  }
+  
+  // Check asking price position
+  if (marketPricing.askingPricePosition === 'significantly_above') {
+    return 'unfavorable';
+  }
+  if (marketPricing.askingPricePosition === 'significantly_below') {
+    return 'favorable';
+  }
+  
+  return 'neutral';
+}
+
+/**
+ * Assess environmental risk contribution to verdict
+ */
+function assessEnvironmentalRiskContribution(
+  environmentalRisk?: VerdictResult['environmentalRisk']
+): 'low' | 'medium' | 'high' | null {
+  if (!environmentalRisk) return null;
+  
+  if (environmentalRisk.overallRisk === 'high') return 'high';
+  if (environmentalRisk.overallRisk === 'medium') return 'medium';
+  return 'low';
+}
+
+/**
+ * Assemble verdict from categorized risk signals and premium features
  */
 export function assembleVerdict(
   flags: RedFlag[],
-  dataQuality: DataQualityAssessment | undefined
+  dataQuality: DataQualityAssessment | undefined,
+  result?: Partial<VerdictResult>
 ): VerdictReasoning {
   const { structural, market, sellerBehavior } = categorizeFlags(flags);
+  
+  // Assess premium feature contributions
+  const maintenanceRisk = assessMaintenanceRiskContribution(result?.maintenanceRiskAssessment);
+  const marketPosition = assessMarketPositionContribution(result?.marketPricingAnalysis);
+  const environmentalRiskLevel = assessEnvironmentalRiskContribution(result?.environmentalRisk);
   
   const hasStrongStructural = hasStrongStructuralRisk(structural);
   const onlyEnvironmental = hasOnlyEnvironmentalRisk(structural);
@@ -152,10 +216,17 @@ export function assembleVerdict(
   const marketCount = countMeaningfulRisks(market);
   const sellerBehaviorCount = countMeaningfulRisks(sellerBehavior);
   
-  const totalMeaningfulRisks = structuralCount + marketCount + sellerBehaviorCount;
+  // Count premium feature risks as additional signals
+  let premiumRiskCount = 0;
+  if (maintenanceRisk === 'elevated') premiumRiskCount += 1;
+  if (marketPosition === 'unfavorable') premiumRiskCount += 0.5; // Half weight for market position
+  if (environmentalRiskLevel === 'high' && !onlyEnvironmental) premiumRiskCount += 0.5; // Half weight if not already counted
+  
+  const totalMeaningfulRisks = structuralCount + marketCount + sellerBehaviorCount + Math.floor(premiumRiskCount);
   
   // Rule 1: Deal verdict requires no meaningful risks + medium/high confidence
-  if (totalMeaningfulRisks === 0) {
+  // Elevated maintenance risk or unfavorable market position can prevent Deal
+  if (totalMeaningfulRisks === 0 && maintenanceRisk !== 'elevated' && marketPosition !== 'unfavorable') {
     // Check data quality - low confidence prevents Deal verdict
     const hasLowConfidence = dataQuality?.overallConfidence === 'low';
     const hasMediumOrHighConfidence = !dataQuality || 
@@ -170,19 +241,39 @@ export function assembleVerdict(
         structuralRisks: [],
         marketRisks: [],
         sellerBehaviorRisks: [],
-        dataQualityImpact: 'preventing-deal'
+        dataQualityImpact: 'preventing-deal',
+        contributingFactors: {
+          maintenanceRisk: maintenanceRisk || undefined,
+          marketPosition: marketPosition || undefined,
+          environmentalRisk: environmentalRiskLevel || undefined
+        }
       };
     }
     
     if (hasMediumOrHighConfidence) {
+      let explanation = 'No meaningful risk signals detected. This appears to be a reasonable deal with standard due diligence recommended.';
+      
+      // Add premium feature context if available
+      if (maintenanceRisk === 'medium') {
+        explanation += ' Note: Maintenance risk assessment indicates moderate forward-looking maintenance concerns.';
+      }
+      if (marketPosition === 'favorable') {
+        explanation += ' Market pricing analysis suggests favorable negotiation position.';
+      }
+      
       return {
         verdict: 'deal',
         confidence: dataQuality?.confidenceScore || 85,
-        explanation: 'No meaningful risk signals detected. This appears to be a reasonable deal with standard due diligence recommended.',
+        explanation,
         structuralRisks: [],
         marketRisks: [],
         sellerBehaviorRisks: [],
-        dataQualityImpact: 'none'
+        dataQualityImpact: 'none',
+        contributingFactors: {
+          maintenanceRisk: maintenanceRisk || undefined,
+          marketPosition: marketPosition || undefined,
+          environmentalRisk: environmentalRiskLevel || undefined
+        }
       };
     }
     
@@ -194,13 +285,56 @@ export function assembleVerdict(
       structuralRisks: [],
       marketRisks: [],
       sellerBehaviorRisks: [],
-      dataQualityImpact: 'softening'
+      dataQualityImpact: 'softening',
+      contributingFactors: {
+        maintenanceRisk: maintenanceRisk || undefined,
+        marketPosition: marketPosition || undefined,
+        environmentalRisk: environmentalRiskLevel || undefined
+      }
+    };
+  }
+  
+  // Elevated maintenance risk without other signals -> Caution
+  if (totalMeaningfulRisks === 0 && maintenanceRisk === 'elevated') {
+    return {
+      verdict: 'caution',
+      confidence: Math.max(55, (dataQuality?.confidenceScore || 75) - 5),
+      explanation: 'No red flag signals detected, but maintenance risk assessment indicates elevated forward-looking maintenance concerns. Budget for potential repairs and factor maintenance costs into your decision.',
+      structuralRisks: [],
+      marketRisks: [],
+      sellerBehaviorRisks: [],
+      dataQualityImpact: 'softening',
+      contributingFactors: {
+        maintenanceRisk: 'elevated',
+        marketPosition: marketPosition || undefined,
+        environmentalRisk: environmentalRiskLevel || undefined
+      }
+    };
+  }
+  
+  // Unfavorable market position without other signals -> Caution
+  if (totalMeaningfulRisks === 0 && marketPosition === 'unfavorable') {
+    return {
+      verdict: 'caution',
+      confidence: Math.max(60, (dataQuality?.confidenceScore || 75) - 5),
+      explanation: 'No red flag signals detected, but market pricing analysis indicates the asking price is positioned unfavorably compared to comparable listings. Negotiation leverage appears weak.',
+      structuralRisks: [],
+      marketRisks: [],
+      sellerBehaviorRisks: [],
+      dataQualityImpact: 'softening',
+      contributingFactors: {
+        maintenanceRisk: maintenanceRisk || undefined,
+        marketPosition: 'unfavorable',
+        environmentalRisk: environmentalRiskLevel || undefined
+      }
     };
   }
   
   // Rule 2: Disaster requires strong structural risk + at least one additional signal from another category
+  // Elevated maintenance risk or unfavorable market position can serve as additional signals
   if (hasStrongStructural && !onlyEnvironmental) {
-    const hasAdditionalSignal = marketCount > 0 || sellerBehaviorCount > 0;
+    const hasAdditionalSignal = marketCount > 0 || sellerBehaviorCount > 0 || 
+                                 maintenanceRisk === 'elevated' || marketPosition === 'unfavorable';
     
     if (hasAdditionalSignal) {
       // Strong structural risk confirmed by additional signals
@@ -209,14 +343,29 @@ export function assembleVerdict(
         ? Math.max(50, (dataQuality?.confidenceScore || 75) - 5)
         : (dataQuality?.confidenceScore || 75);
       
+      let explanation = `Strong structural risk (${structural.filter(f => f.severity === 'critical' || f.severity === 'high').map(f => f.title).join(', ')})`;
+      
+      const additionalSignals: string[] = [];
+      if (marketCount > 0) additionalSignals.push('market risk signals');
+      if (sellerBehaviorCount > 0) additionalSignals.push('seller behavior concerns');
+      if (maintenanceRisk === 'elevated') additionalSignals.push('elevated maintenance risk');
+      if (marketPosition === 'unfavorable') additionalSignals.push('unfavorable market pricing');
+      
+      explanation += ` combined with ${additionalSignals.join(', ')}. This combination indicates significant concerns.`;
+      
       return {
         verdict: 'disaster',
         confidence,
-        explanation: `Strong structural risk (${structural.filter(f => f.severity === 'critical' || f.severity === 'high').map(f => f.title).join(', ')}) combined with ${marketCount > 0 ? 'market' : 'seller behavior'} risk signals. This combination indicates significant concerns.`,
+        explanation,
         structuralRisks: structural,
         marketRisks: market,
         sellerBehaviorRisks: sellerBehavior,
-        dataQualityImpact: qualityImpact
+        dataQualityImpact: qualityImpact,
+        contributingFactors: {
+          maintenanceRisk: maintenanceRisk || undefined,
+          marketPosition: marketPosition || undefined,
+          environmentalRisk: environmentalRiskLevel || undefined
+        }
       };
     }
   }
@@ -230,14 +379,26 @@ export function assembleVerdict(
   
   // Environmental risk alone -> Caution
   if (onlyEnvironmental) {
+    let explanation = 'Environmental exposure detected, but this is a probabilistic signal and not proof of damage. Inspect carefully for water damage or corrosion.';
+    
+    // Add maintenance risk context if available
+    if (maintenanceRisk === 'elevated') {
+      explanation += ' Combined with elevated maintenance risk, this suggests increased inspection priority.';
+    }
+    
     return {
       verdict: 'caution',
       confidence: Math.max(50, (dataQuality?.confidenceScore || 75) - 10),
-      explanation: 'Environmental exposure detected, but this is a probabilistic signal and not proof of damage. Inspect carefully for water damage or corrosion.',
+      explanation,
       structuralRisks: structural,
       marketRisks: market,
       sellerBehaviorRisks: sellerBehavior,
-      dataQualityImpact: 'softening'
+      dataQualityImpact: 'softening',
+      contributingFactors: {
+        maintenanceRisk: maintenanceRisk || undefined,
+        marketPosition: marketPosition || undefined,
+        environmentalRisk: environmentalRiskLevel || undefined
+      }
     };
   }
   
@@ -263,67 +424,134 @@ export function assembleVerdict(
       ? Math.max(50, (dataQuality?.confidenceScore || 75) - 5)
       : (dataQuality?.confidenceScore || 70);
     
+    const categories: string[] = [];
+    if (structuralCount > 0) categories.push('structural');
+    if (marketCount > 0) categories.push('market');
+    if (sellerBehaviorCount > 0) categories.push('seller behavior');
+    if (maintenanceRisk === 'elevated') categories.push('maintenance');
+    if (marketPosition === 'unfavorable') categories.push('pricing');
+    
+    let explanation = `Multiple risk signals detected across ${categories.join(', ')} categories. While no single signal is critical, the combination warrants careful investigation.`;
+    
+    if (maintenanceRisk === 'elevated') {
+      explanation += ' Elevated maintenance risk suggests budgeting for potential repairs.';
+    }
+    if (marketPosition === 'unfavorable') {
+      explanation += ' Market pricing analysis indicates weak negotiation leverage.';
+    }
+    
     return {
       verdict: 'caution',
       confidence,
-      explanation: `Multiple risk signals detected across ${structuralCount > 0 ? 'structural, ' : ''}${marketCount > 0 ? 'market, ' : ''}${sellerBehaviorCount > 0 ? 'seller behavior' : ''} categories. While no single signal is critical, the combination warrants careful investigation.`,
+      explanation,
       structuralRisks: structural,
       marketRisks: market,
       sellerBehaviorRisks: sellerBehavior,
-      dataQualityImpact: qualityImpact
+      dataQualityImpact: qualityImpact,
+      contributingFactors: {
+        maintenanceRisk: maintenanceRisk || undefined,
+        marketPosition: marketPosition || undefined,
+        environmentalRisk: environmentalRiskLevel || undefined
+      }
     };
   }
   
   // Moderate structural risk without additional signals -> Caution
-  if (structuralCount > 0 && !hasStrongStructural && marketCount === 0 && sellerBehaviorCount === 0) {
+  if (structuralCount > 0 && !hasStrongStructural && marketCount === 0 && sellerBehaviorCount === 0 && 
+      maintenanceRisk !== 'elevated' && marketPosition !== 'unfavorable') {
+    let explanation = `Moderate structural risk detected (${structural.map(f => f.title).join(', ')}). Investigate thoroughly before proceeding.`;
+    if (maintenanceRisk === 'medium') {
+      explanation += ' Maintenance risk assessment indicates moderate forward-looking concerns.';
+    }
+    
     return {
       verdict: 'caution',
       confidence: Math.max(55, (dataQuality?.confidenceScore || 75) - 5),
-      explanation: `Moderate structural risk detected (${structural.map(f => f.title).join(', ')}). Investigate thoroughly before proceeding.`,
+      explanation,
       structuralRisks: structural,
       marketRisks: market,
       sellerBehaviorRisks: sellerBehavior,
-      dataQualityImpact: 'softening'
+      dataQualityImpact: 'softening',
+      contributingFactors: {
+        maintenanceRisk: maintenanceRisk || undefined,
+        marketPosition: marketPosition || undefined,
+        environmentalRisk: environmentalRiskLevel || undefined
+      }
     };
   }
   
   // Strong structural risk without additional signals -> Caution (not Disaster)
-  if (hasStrongStructural && marketCount === 0 && sellerBehaviorCount === 0) {
+  if (hasStrongStructural && marketCount === 0 && sellerBehaviorCount === 0 && 
+      maintenanceRisk !== 'elevated' && marketPosition !== 'unfavorable') {
+    let explanation = `Strong structural risk detected (${structural.filter(f => f.severity === 'critical' || f.severity === 'high').map(f => f.title).join(', ')}), but no additional confirming signals from market or seller behavior. Proceed with extreme caution and thorough inspection.`;
+    if (maintenanceRisk === 'elevated') {
+      explanation += ' Elevated maintenance risk adds to concerns.';
+    }
+    
     return {
       verdict: 'caution',
       confidence: Math.max(50, (dataQuality?.confidenceScore || 75) - 10),
-      explanation: `Strong structural risk detected (${structural.filter(f => f.severity === 'critical' || f.severity === 'high').map(f => f.title).join(', ')}), but no additional confirming signals from market or seller behavior. Proceed with extreme caution and thorough inspection.`,
+      explanation,
       structuralRisks: structural,
       marketRisks: market,
       sellerBehaviorRisks: sellerBehavior,
-      dataQualityImpact: 'softening'
+      dataQualityImpact: 'softening',
+      contributingFactors: {
+        maintenanceRisk: maintenanceRisk || undefined,
+        marketPosition: marketPosition || undefined,
+        environmentalRisk: environmentalRiskLevel || undefined
+      }
     };
   }
   
   // Single moderate risk -> Caution
-  if (totalMeaningfulRisks === 1) {
+  if (totalMeaningfulRisks === 1 && maintenanceRisk !== 'elevated' && marketPosition !== 'unfavorable') {
     const singleRisk = [...structural, ...market, ...sellerBehavior].find(r => r.severity !== 'low');
+    let explanation = `One moderate risk signal detected: ${singleRisk?.title || 'risk identified'}. Investigate this concern before proceeding.`;
+    if (maintenanceRisk === 'medium') {
+      explanation += ' Maintenance risk assessment indicates moderate forward-looking concerns.';
+    }
+    
     return {
       verdict: 'caution',
       confidence: Math.max(60, (dataQuality?.confidenceScore || 75) - 5),
-      explanation: `One moderate risk signal detected: ${singleRisk?.title || 'risk identified'}. Investigate this concern before proceeding.`,
+      explanation,
       structuralRisks: structural,
       marketRisks: market,
       sellerBehaviorRisks: sellerBehavior,
-      dataQualityImpact: 'softening'
+      dataQualityImpact: 'softening',
+      contributingFactors: {
+        maintenanceRisk: maintenanceRisk || undefined,
+        marketPosition: marketPosition || undefined,
+        environmentalRisk: environmentalRiskLevel || undefined
+      }
     };
   }
   
   // Fallback: Default to Caution for any remaining cases
   const qualityImpact = assessDataQualityImpact(dataQuality, 'caution');
+  let explanation = 'Risk signals detected that warrant investigation. Review all concerns carefully before making a decision.';
+  
+  if (maintenanceRisk === 'elevated') {
+    explanation += ' Elevated maintenance risk suggests budgeting for potential repairs.';
+  }
+  if (marketPosition === 'unfavorable') {
+    explanation += ' Market pricing analysis indicates weak negotiation leverage.';
+  }
+  
   return {
     verdict: 'caution',
     confidence: Math.max(50, (dataQuality?.confidenceScore || 70) - 5),
-    explanation: 'Risk signals detected that warrant investigation. Review all concerns carefully before making a decision.',
+    explanation,
     structuralRisks: structural,
     marketRisks: market,
     sellerBehaviorRisks: sellerBehavior,
-    dataQualityImpact: qualityImpact
+    dataQualityImpact: qualityImpact,
+    contributingFactors: {
+      maintenanceRisk: maintenanceRisk || undefined,
+      marketPosition: marketPosition || undefined,
+      environmentalRisk: environmentalRiskLevel || undefined
+    }
   };
 }
 

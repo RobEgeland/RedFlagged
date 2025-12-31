@@ -34,3 +34,4 @@ Since MarketCheck is used server-side in your Next.js app, the best way to test 
 
 This tests the actual integration path your app uses!
 
+

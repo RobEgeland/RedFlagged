@@ -1098,51 +1098,25 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
   // Assess data quality first (needed for verdict assembly)
   const dataQuality = assessDataQuality(request, preliminaryResult);
   
-  // Determine verdict using new assembly system
-  const verdictReasoning = assembleVerdict(redFlags, dataQuality);
+  // Build result with premium features for verdict assembly (market pricing analysis added later)
+  const resultForVerdict: Partial<VerdictResult> = {
+    ...preliminaryResult,
+    maintenanceRiskAssessment: maintenanceRiskAssessment || undefined,
+    marketPricingAnalysis: undefined, // Will be added after verdict assembly
+    environmentalRisk: environmentalRisk || undefined
+  };
+  
+  // Determine verdict using new assembly system (pass result to access premium features)
+  const verdictReasoning = assembleVerdict(redFlags, dataQuality, resultForVerdict);
   const verdict = verdictReasoning.verdict;
   const confidence = verdictReasoning.confidence;
   
-  // Generate summary using verdict reasoning explanation
-  // Free tier gets complete decision-making explanation, paid tier gets expanded context
-  let summary: string;
-  if (tier === 'free') {
-    // Free tier: Use verdict reasoning explanation (complete but concise)
-    summary = verdictReasoning.explanation;
-    
-    // Add price context if available and relevant
-    if (verdict === 'deal' && priceDiffPercent < 0 && priceDiffPercent !== undefined) {
-      summary = `This appears to be a solid deal. The asking price is ${Math.abs(priceDiffPercent).toFixed(0)}% below market value. ${summary}`;
-    } else if (verdict === 'deal' && priceDiffPercent !== undefined && priceDiffPercent > 0 && priceDiffPercent < 15) {
-      summary = `This vehicle is priced reasonably. ${summary}`;
-    } else if (verdict === 'caution' && priceDiffPercent !== undefined && priceDiffPercent > 15) {
-      summary = `Priced ${priceDiffPercent.toFixed(0)}% above market. ${summary}`;
-    }
-  } else {
-    // Paid tier: Enhanced explanation with detailed context
-    summary = verdictReasoning.explanation;
-    
-    // Enhance with detailed price context
-    if (verdict === 'deal' && priceDiffPercent < 0) {
-      summary = `This appears to be a solid deal. The asking price is ${Math.abs(priceDiffPercent).toFixed(1)}% below market value. ${summary}`;
-    } else if (verdict === 'deal' && priceDiffPercent > 0 && priceDiffPercent < 15) {
-      summary = `This vehicle is priced reasonably. ${summary}`;
-    } else if (verdict === 'caution' && priceDiffPercent > 15) {
-      summary = `Priced ${priceDiffPercent.toFixed(1)}% above market value. ${summary}`;
-    }
-    
-    // Add data quality context for paid tier
-    if (dataQuality && dataQuality.overallConfidence === 'low') {
-      summary = `${summary} Note: Limited data quality may affect confidence in this assessment.`;
-    }
-  }
-  
-  // Build final result with verdict and data quality
+  // Build final result with verdict and data quality (summary and market pricing analysis will be added below)
   const result: VerdictResult = {
     tier,
     verdict,
     confidenceScore: confidence,
-    summary,
+    summary: '', // Will be set after premium features are added
     redFlags,
     questionsToAsk,
     knownData,
@@ -1251,6 +1225,66 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
       medium: tailoredQuestions.categories.medium.length,
       low: tailoredQuestions.categories.low.length
     });
+    
+    // Generate summary now that all premium features are available
+    // Paid tier: Enhanced explanation with detailed context from premium features
+    let summary = verdictReasoning.explanation;
+    
+    // Enhance with detailed price context from market pricing analysis if available
+    if (result.marketPricingAnalysis) {
+      const mpa = result.marketPricingAnalysis;
+      if (verdict === 'deal' && mpa.askingPricePosition === 'significantly_below') {
+        summary = `This appears to be a solid deal. Market pricing analysis shows the asking price is significantly below comparable listings (${mpa.percentilePosition ? `${100 - mpa.percentilePosition}th` : 'lower'} percentile). ${summary}`;
+      } else if (verdict === 'deal' && mpa.askingPricePosition === 'at_or_below_median') {
+        summary = `This vehicle is priced reasonably. Market pricing analysis indicates the asking price is at or below the median of comparable listings. ${summary}`;
+      } else if (verdict === 'caution' && mpa.askingPricePosition === 'significantly_above') {
+        summary = `Market pricing analysis shows the asking price is significantly above comparable listings (${mpa.percentilePosition ? `${mpa.percentilePosition}th` : 'higher'} percentile). ${summary}`;
+      } else if (verdict === 'caution' && mpa.negotiationLeverage?.level === 'weak') {
+        summary = `${summary} Market pricing analysis indicates weak negotiation leverage.`;
+      }
+    } else {
+      // Fallback to basic price context if market pricing analysis not available
+      if (verdict === 'deal' && priceDiffPercent !== undefined && priceDiffPercent < 0) {
+        summary = `This appears to be a solid deal. The asking price is ${Math.abs(priceDiffPercent).toFixed(1)}% below market value. ${summary}`;
+      } else if (verdict === 'deal' && priceDiffPercent !== undefined && priceDiffPercent > 0 && priceDiffPercent < 15) {
+        summary = `This vehicle is priced reasonably. ${summary}`;
+      } else if (verdict === 'caution' && priceDiffPercent !== undefined && priceDiffPercent > 15) {
+        summary = `Priced ${priceDiffPercent.toFixed(1)}% above market value. ${summary}`;
+      }
+    }
+    
+    // Add maintenance risk context for paid tier
+    if (result.maintenanceRiskAssessment && result.maintenanceRiskAssessment.overallRisk === 'elevated' && 
+        !summary.includes('maintenance risk') && !summary.includes('maintenance concerns')) {
+      summary = `${summary} Maintenance risk assessment indicates elevated forward-looking maintenance concerns.`;
+    }
+    
+    // Add environmental risk context if not already mentioned
+    if (result.environmentalRisk && result.environmentalRisk.overallRisk === 'high' && 
+        !summary.includes('environmental') && !summary.includes('water damage')) {
+      summary = `${summary} Environmental risk assessment indicates high exposure to disaster events.`;
+    }
+    
+    // Add data quality context for paid tier
+    if (dataQuality && dataQuality.overallConfidence === 'low') {
+      summary = `${summary} Note: Limited data quality may affect confidence in this assessment.`;
+    }
+    
+    result.summary = summary;
+  } else {
+    // Free tier: Generate summary with basic context
+    let summary = verdictReasoning.explanation;
+    
+    // Add price context if available and relevant
+    if (verdict === 'deal' && priceDiffPercent !== undefined && priceDiffPercent < 0) {
+      summary = `This appears to be a solid deal. The asking price is ${Math.abs(priceDiffPercent).toFixed(0)}% below market value. ${summary}`;
+    } else if (verdict === 'deal' && priceDiffPercent !== undefined && priceDiffPercent > 0 && priceDiffPercent < 15) {
+      summary = `This vehicle is priced reasonably. ${summary}`;
+    } else if (verdict === 'caution' && priceDiffPercent !== undefined && priceDiffPercent > 15) {
+      summary = `Priced ${priceDiffPercent.toFixed(0)}% above market. ${summary}`;
+    }
+    
+    result.summary = summary;
   }
   
   return result;
