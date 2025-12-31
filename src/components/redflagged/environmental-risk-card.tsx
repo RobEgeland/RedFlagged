@@ -87,19 +87,20 @@ export function EnvironmentalRiskCard({ environmentalRisk }: EnvironmentalRiskCa
                   <div className="mt-3 pt-3 border-t border-gray-200">
                     <p className="text-xs font-medium text-gray-700 mb-2">Recent Disasters (Last 3 Years):</p>
                     <ul className="space-y-1">
-                      {recentDisasters.map((disaster, index) => (
-                        <li key={index} className="text-xs text-gray-600">
-                          <span className="font-semibold">{disaster.disasterType}</span>
-                          {' - '}
-                          <span>{new Date(disaster.declarationDate).toLocaleDateString('en-US', { 
-                            year: 'numeric', 
-                            month: 'short', 
-                            day: 'numeric' 
-                          })}</span>
-                          {' '}
-                          <span className="text-gray-500">({disaster.daysAgo} days ago)</span>
-                        </li>
-                      ))}
+                      {recentDisasters.map((disaster, index) => {
+                        const date = new Date(disaster.declarationDate);
+                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        const formattedDate = `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+                        return (
+                          <li key={index} className="text-xs text-gray-600">
+                            <span className="font-semibold">{disaster.disasterType}</span>
+                            {' - '}
+                            <span>{formattedDate}</span>
+                            {' '}
+                            <span className="text-gray-500">({disaster.daysAgo} days ago)</span>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 )}
@@ -109,17 +110,18 @@ export function EnvironmentalRiskCard({ environmentalRisk }: EnvironmentalRiskCa
                   <div className="mt-3 pt-3 border-t border-gray-200">
                     <p className="text-xs font-medium text-gray-700 mb-2">Historical Disasters (3-5 Years Ago):</p>
                     <ul className="space-y-1">
-                      {historicalDisasters.map((disaster, index) => (
-                        <li key={index} className="text-xs text-gray-600">
-                          <span className="font-semibold">{disaster.disasterType}</span>
-                          {' - '}
-                          <span>{new Date(disaster.declarationDate).toLocaleDateString('en-US', { 
-                            year: 'numeric', 
-                            month: 'short', 
-                            day: 'numeric' 
-                          })}</span>
-                        </li>
-                      ))}
+                      {historicalDisasters.map((disaster, index) => {
+                        const date = new Date(disaster.declarationDate);
+                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        const formattedDate = `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+                        return (
+                          <li key={index} className="text-xs text-gray-600">
+                            <span className="font-semibold">{disaster.disasterType}</span>
+                            {' - '}
+                            <span>{formattedDate}</span>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 )}
@@ -193,23 +195,6 @@ export function EnvironmentalRiskCard({ environmentalRisk }: EnvironmentalRiskCa
             </div>
           </div>
         )}
-
-        {/* Confidence Level */}
-        <div className="pt-4 border-t border-gray-200">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-gray-700">Confidence Level:</span>
-            <span className="text-xs font-semibold text-gray-900">{environmentalRisk.confidence}%</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-blue-600 h-2 rounded-full" 
-              style={{ width: `${environmentalRisk.confidence}%` }}
-            />
-          </div>
-          <p className="text-xs text-gray-500 mt-2">
-            Confidence based on data quality: state identification, county mapping, and disaster data availability.
-          </p>
-        </div>
 
         {/* Important Note */}
         <div className="pt-4 border-t border-gray-200">

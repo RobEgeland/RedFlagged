@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import { 
   Zap, 
   Check, 
@@ -46,20 +48,48 @@ const premiumFeatures = [
 ];
 
 export function UpgradePrompt({ reportId }: UpgradePromptProps) {
+  const { isSignedIn, user } = useUser();
+  const router = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showSignInPrompt, setShowSignInPrompt] = useState(false);
+
+  // Generate reportId from localStorage if not provided
+  const getReportId = (): string => {
+    if (reportId) return reportId;
+    
+    // Try to get from localStorage
+    const stored = localStorage.getItem("currentReport");
+    if (stored) {
+      // Generate a simple ID from timestamp
+      return `report_${Date.now()}`;
+    }
+    
+    return `report_${Date.now()}`;
+  };
 
   const handleUpgrade = async () => {
+    // Check if user is signed in
+    if (!isSignedIn || !user) {
+      setShowSignInPrompt(true);
+      setIsModalOpen(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
+      const currentReportId = getReportId();
+      const userEmail = user.emailAddresses[0]?.emailAddress || '';
+
       const response = await fetch("/api/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          reportId: reportId || "unknown",
+          reportId: currentReportId,
           amount: 2000,
+          email: userEmail,
         }),
       });
 
@@ -81,6 +111,24 @@ export function UpgradePrompt({ reportId }: UpgradePromptProps) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSignIn = () => {
+    // Store current URL to redirect back after sign-in
+    const currentPath = window.location.pathname;
+    const searchParams = window.location.search;
+    const redirectUrl = `${currentPath}${searchParams}`;
+    
+    router.push(`/sign-in?redirect=${encodeURIComponent(redirectUrl)}`);
+  };
+
+  const handleSignUp = () => {
+    // Store current URL to redirect back after sign-up
+    const currentPath = window.location.pathname;
+    const searchParams = window.location.search;
+    const redirectUrl = `${currentPath}${searchParams}`;
+    
+    router.push(`/sign-up?redirect=${encodeURIComponent(redirectUrl)}`);
   };
 
   return (
@@ -203,6 +251,52 @@ export function UpgradePrompt({ reportId }: UpgradePromptProps) {
                 Secure checkout powered by Stripe. Report available immediately after payment.
               </p>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sign-In Prompt Dialog */}
+      <Dialog open={showSignInPrompt} onOpenChange={setShowSignInPrompt}>
+        <DialogContent className="max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-2xl md:text-3xl font-semibold text-gray-900 text-center">
+              Sign In Required
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="mt-6 text-center space-y-6">
+            <div className="flex justify-center">
+              <div className="p-4 bg-gray-100 rounded-full">
+                <LogIn className="w-8 h-8 text-gray-600" />
+              </div>
+            </div>
+            
+            <p className="text-gray-700">
+              You need to be signed in to purchase a premium report. Sign in to your account or create a new one to continue.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button
+                onClick={handleSignIn}
+                className="bg-charcoal hover:bg-charcoal/90 text-cream font-semibold px-8 py-6 rounded-lg"
+              >
+                <span className="flex items-center gap-2">
+                  <LogIn className="w-5 h-5" />
+                  Sign In
+                </span>
+              </Button>
+              <Button
+                onClick={handleSignUp}
+                variant="outline"
+                className="border-charcoal text-charcoal hover:bg-gray-50 font-semibold px-8 py-6 rounded-lg"
+              >
+                Sign Up
+              </Button>
+            </div>
+
+            <p className="text-xs text-gray-500">
+              After signing in, you'll be redirected back here to complete your purchase.
+            </p>
           </div>
         </DialogContent>
       </Dialog>

@@ -11,8 +11,7 @@ import {
   FileQuestion,
   ClipboardList,
   Users,
-  AlertCircle,
-  Lock
+  AlertCircle
 } from "lucide-react";
 
 interface RedFlagCardProps {
@@ -60,7 +59,6 @@ export function RedFlagCard({ flag, index, tier = 'free' }: RedFlagCardProps) {
   const CategoryIcon = categoryIcons[flag.category] || Flag;
   
   const animationDelay = `${index * 40}ms`;
-  const isLocked = tier === 'free' && flag.isPremium;
 
   return (
     <div 
@@ -69,22 +67,11 @@ export function RedFlagCard({ flag, index, tier = 'free' }: RedFlagCardProps) {
         shadow-[0_1px_3px_rgba(0,0,0,0.1)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.12)]
         transition-all duration-150 hover:translate-y-[-2px]]
         animate-fade-in-up cursor-pointer
-        ${isLocked ? 'opacity-60' : ''}
       `}
       style={{ animationDelay }}
-      onClick={() => !isLocked && setIsExpanded(!isExpanded)}
+      onClick={() => setIsExpanded(!isExpanded)}
     >
       <div className="p-5 md:p-6 relative">
-        {/* Lock overlay for premium flags in free tier */}
-        {isLocked && (
-          <div className="absolute inset-0 bg-gradient-to-br from-gray-900/5 to-gray-900/10 backdrop-blur-[2px] z-20 flex items-center justify-center">
-            <div className="bg-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
-              <Lock className="w-4 h-4 text-gray-600" />
-              <span className="text-sm font-semibold text-gray-900">Premium</span>
-            </div>
-          </div>
-        )}
-        
         <div className="relative z-10">
           {/* Header */}
           <div className="flex items-start justify-between gap-3 mb-3">
@@ -107,7 +94,6 @@ export function RedFlagCard({ flag, index, tier = 'free' }: RedFlagCardProps) {
                 </span>
               </div>
             </div>
-            {!isLocked && (
               <button 
                 className="p-1.5 hover:bg-gray-100 rounded-md transition-colors"
                 onClick={(e) => {
@@ -121,7 +107,6 @@ export function RedFlagCard({ flag, index, tier = 'free' }: RedFlagCardProps) {
                   <ChevronDown className="w-5 h-5 text-gray-500" />
                 )}
               </button>
-            )}
           </div>
 
           {/* Title */}
@@ -134,8 +119,8 @@ export function RedFlagCard({ flag, index, tier = 'free' }: RedFlagCardProps) {
             {flag.description}
           </p>
 
-          {/* Expanded Content - only for paid tier */}
-          {!isLocked && isExpanded && (flag.expandedDetails || flag.methodology) && (
+          {/* Expanded Content - paid tier gets expanded details and methodology */}
+          {isExpanded && (flag.expandedDetails || flag.methodology) && (
             <div className="mt-5 pt-5 border-t border-gray-200 space-y-4 animate-fade-in-up">
               {flag.expandedDetails && (
                 <div>

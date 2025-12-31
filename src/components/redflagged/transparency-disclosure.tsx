@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Eye, 
   EyeOff, 
@@ -20,7 +20,13 @@ interface TransparencyDisclosureProps {
 
 export function TransparencyDisclosure({ knownData, unknownData, tier = 'free' }: TransparencyDisclosureProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [generatedDate, setGeneratedDate] = useState<string>("");
   const isFree = tier === 'free';
+
+  // Set date client-side only to avoid hydration mismatch
+  useEffect(() => {
+    setGeneratedDate(new Date().toLocaleDateString());
+  }, []);
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden animate-fade-in-up shadow-sm">
@@ -107,7 +113,7 @@ export function TransparencyDisclosure({ knownData, unknownData, tier = 'free' }
             <p>Market pricing: Aggregated from public listings and auction data</p>
             <p>VIN decode: NHTSA VIN decoder database</p>
             {!isFree && <p>Disaster data: FEMA disaster zone records</p>}
-            <p>Analysis generated: {new Date().toLocaleDateString()}</p>
+            <p>Analysis generated: {generatedDate || "—"}</p>
             {isFree && <p className="text-caution font-medium">⚠️ Limited data sources in free tier - upgrade for complete analysis</p>}
           </div>
         </div>

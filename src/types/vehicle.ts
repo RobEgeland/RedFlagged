@@ -42,22 +42,33 @@ export interface CarfaxAutoCheckData {
 }
 
 // Market Listings Data Types
+export interface RawListing {
+  price: number;
+  mileage?: number;
+  location?: {
+    city?: string;
+    state?: string;
+    zip?: string;
+  };
+  dealer?: string;
+  listingType?: 'dealer' | 'private-party';
+}
+
 export interface MarketListingsData {
-  edmundsAPI?: {
-    trueMarketValue: number;
-    retailPrice: number;
-  };
-  kelleyBlueBook?: {
-    fairPurchasePrice: number;
-    typicalListingPrice: number;
-  };
   autoDev?: {
     marketAverage: number;
     priceRange: { min: number; max: number };
+    rawListings?: RawListing[]; // Raw listings for detailed analysis (paid tier)
   };
   marketCheck?: {
-    competitivePrice: number;
-    daysToPriceImprovement: number;
+    competitivePrice?: number;
+    daysToPriceImprovement?: number;
+    salesStats?: {
+      averagePrice: number;
+      medianPrice: number;
+      salesCount: number;
+      priceRange?: { min: number; max: number };
+    };
   };
 }
 
@@ -179,6 +190,22 @@ export interface RedFlag {
   dataSource?: string;
 }
 
+export interface DataQualityFactor {
+  id: string;
+  name: string;
+  status: 'complete' | 'partial' | 'missing' | 'unavailable';
+  impact: 'high' | 'medium' | 'low';
+  explanation: string;
+}
+
+export interface DataQualityAssessment {
+  overallConfidence: 'high' | 'medium' | 'low';
+  confidenceScore: number; // 0-100
+  factors: DataQualityFactor[];
+  summary: string;
+  recommendations: string[];
+}
+
 export interface VerdictResult {
   tier: AnalysisTier;
   verdict: VerdictType;
@@ -206,6 +233,96 @@ export interface VerdictResult {
     pricingBehavior?: PricingBehaviorSignals;
     profileConsistency?: SellerProfileConsistency;
   };
+  maintenanceRiskAssessment?: {
+    overallRisk: 'low' | 'medium' | 'elevated';
+    classification: string;
+    riskFactors: Array<{
+      component: string;
+      riskLevel: 'low' | 'medium' | 'high';
+      description: string;
+      typicalMileageRange?: string;
+      typicalAgeRange?: string;
+    }>;
+    inspectionFocus: Array<{
+      component: string;
+      priority: 'high' | 'medium' | 'low';
+      reason: string;
+      whatToCheck: string;
+    }>;
+    buyerChecklist: string[];
+    confidence: 'high' | 'medium' | 'low';
+    confidenceNote?: string;
+  };
+  marketPricingAnalysis?: {
+    priceRanges: {
+      low: number;
+      median: number;
+      high: number;
+      percentile25: number;
+      percentile75: number;
+    };
+    askingPricePosition: {
+      percentile: number;
+      position: 'below' | 'at' | 'above';
+      differencePercent: number;
+    };
+    comparableCount: number;
+    geographicScope: string;
+    listingType: 'dealer' | 'private-party' | 'mixed' | 'unknown';
+    marketComparison: string;
+    negotiationLeverage: {
+      level: 'strong' | 'moderate' | 'limited' | 'none';
+      explanation: string;
+      suggestedApproach: string;
+    };
+    confidence: 'high' | 'medium' | 'low';
+    limitations: string[];
+    dataQuality: {
+      hasEnoughData: boolean;
+      dataSparsity: 'sparse' | 'moderate' | 'adequate';
+      regionalVariance: boolean;
+    };
+  };
+  tailoredQuestions?: {
+    questions: Array<{
+      question: string;
+      category: 'title-history' | 'pricing' | 'maintenance' | 'condition' | 'seller' | 'environmental' | 'general';
+      priority: 'critical' | 'high' | 'medium' | 'low';
+      context: string;
+      relatedFindings?: string[];
+    }>;
+    summary: string;
+    categories: {
+      critical: Array<{
+        question: string;
+        category: string;
+        priority: string;
+        context: string;
+        relatedFindings?: string[];
+      }>;
+      high: Array<{
+        question: string;
+        category: string;
+        priority: string;
+        context: string;
+        relatedFindings?: string[];
+      }>;
+      medium: Array<{
+        question: string;
+        category: string;
+        priority: string;
+        context: string;
+        relatedFindings?: string[];
+      }>;
+      low: Array<{
+        question: string;
+        category: string;
+        priority: string;
+        context: string;
+        relatedFindings?: string[];
+      }>;
+    };
+  };
   // Premium features (computed from above)
   carfaxSummary?: string;
   comparableListings?: Array<{
@@ -229,6 +346,8 @@ export interface VerdictResult {
     nhtsaCampaignNumber?: string;
     reportReceivedDate?: string;
   }>;
+  // Data quality and confidence assessment
+  dataQuality?: DataQualityAssessment;
 }
 
 export interface AnalysisRequest {

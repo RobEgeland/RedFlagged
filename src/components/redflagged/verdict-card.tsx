@@ -57,7 +57,7 @@ export function VerdictCard({
         )}
         
         {/* Verdict Header */}
-        <div className="flex items-start justify-between gap-6 mb-6">
+        <div className="flex items-start gap-6 mb-6">
           <div className="flex items-center gap-5">
             <div className="p-4 bg-white/15 rounded-lg backdrop-blur-sm">
               <Icon className="w-10 h-10 md:w-12 md:h-12" strokeWidth={2} />
@@ -69,16 +69,6 @@ export function VerdictCard({
               <p className="text-base md:text-lg opacity-90">
                 {config.description}
               </p>
-            </div>
-          </div>
-          
-          {/* Confidence Score */}
-          <div className="text-right flex-shrink-0">
-            <div className="font-mono text-3xl md:text-4xl font-semibold leading-none mb-1">
-              {tier === 'free' ? '—' : `${confidenceScore}%`}
-            </div>
-            <div className="text-xs font-medium opacity-75 uppercase tracking-widest">
-              Confidence
             </div>
           </div>
         </div>

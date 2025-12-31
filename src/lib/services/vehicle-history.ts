@@ -339,18 +339,18 @@ export async function fetchNMVTISData(vin: string): Promise<NMVTISData | null> {
     // If no API key is configured, return mock data for development
     if (!config.apiKey) {
       console.warn('[Auto.dev] API key not configured. Using mock data. Set AUTO_DEV_API_KEY to use real data.');
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      return {
-        titleBrands: [],
-        salvageRecord: false,
-        theftRecords: false,
-        stateTitle: 'Clean',
-        odometer: [
-          { reading: 50000, date: '2023-01-15' },
-          { reading: 45000, date: '2022-01-10' }
-        ]
-      };
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    return {
+      titleBrands: [],
+      salvageRecord: false,
+      theftRecords: false,
+      stateTitle: 'Clean',
+      odometer: [
+        { reading: 50000, date: '2023-01-15' },
+        { reading: 45000, date: '2022-01-10' }
+      ]
+    };
     }
 
     console.log(`[Auto.dev] Fetching data for VIN: ${vin}`);

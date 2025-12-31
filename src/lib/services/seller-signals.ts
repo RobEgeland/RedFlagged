@@ -887,12 +887,12 @@ export async function analyzeAllSellerSignals(
   profileConsistency: SellerProfileConsistency;
 }> {
   try {
-    const [listingBehavior, pricingBehavior, profileConsistency] = await Promise.all([
-      analyzeListingBehavior(vin, listingUrl),
-      analyzePricingBehavior(vin, currentPrice),
-      analyzeSellerProfile(sellerInfo)
-    ]);
-    
+  const [listingBehavior, pricingBehavior, profileConsistency] = await Promise.all([
+    analyzeListingBehavior(vin, listingUrl),
+    analyzePricingBehavior(vin, currentPrice),
+    analyzeSellerProfile(sellerInfo)
+  ]);
+  
     // Always return an object structure, even if empty
     return {
       listingBehavior: listingBehavior || {},
@@ -902,11 +902,11 @@ export async function analyzeAllSellerSignals(
   } catch (error) {
     console.error('[Seller Signals] Error in analyzeAllSellerSignals:', error);
     // Return empty structure on error so card can still display
-    return {
+  return {
       listingBehavior: {},
       pricingBehavior: {},
       profileConsistency: {}
-    };
+  };
   }
 }
 

@@ -9,7 +9,11 @@ import { TransparencyDisclosure } from "./transparency-disclosure";
 import { UpgradePrompt } from "./upgrade-prompt";
 import { SellerSignalsCard } from "./seller-signals-card";
 import { EnvironmentalRiskCard } from "./environmental-risk-card";
-import { Flag, RotateCcw, FileText, MapPin, UserCheck, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
+import { DataQualityCard } from "./data-quality-card";
+import { MaintenanceRiskCard } from "./maintenance-risk-card";
+import { MarketPricingAnalysisCard } from "./market-pricing-analysis-card";
+import { TailoredQuestionsCard } from "./tailored-questions-card";
+import { Flag, RotateCcw, FileText, MapPin, UserCheck, AlertTriangle, ChevronDown, ChevronUp, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface AnalysisResultsProps {
@@ -140,13 +144,13 @@ export function AnalysisResults({ result, onReset }: AnalysisResultsProps) {
           <div>
             <p className="text-xs uppercase tracking-wider text-gray-600 font-semibold mb-1.5">Difference</p>
             {result.vehicleInfo.priceDifference !== undefined ? (
-              <p className={`font-mono text-2xl md:text-3xl font-semibold ${
+            <p className={`font-mono text-2xl md:text-3xl font-semibold ${
                 result.vehicleInfo.priceDifference > 0 ? 'text-disaster' : 
                 result.vehicleInfo.priceDifference < 0 ? 'text-deal' : 
                 'text-gray-900'
-              }`}>
+            }`}>
                 {result.vehicleInfo.priceDifference > 0 ? '+' : ''}${result.vehicleInfo.priceDifference.toLocaleString()}
-              </p>
+            </p>
             ) : (
               <p className="font-mono text-2xl md:text-3xl font-semibold text-gray-400">—</p>
             )}
@@ -179,6 +183,11 @@ export function AnalysisResults({ result, onReset }: AnalysisResultsProps) {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Data Quality & Confidence - Placed after red flags as secondary, trust-building information */}
+      {result.dataQuality && (
+        <DataQualityCard dataQuality={result.dataQuality} />
       )}
 
       {/* Vehicle Recalls */}
@@ -220,7 +229,11 @@ export function AnalysisResults({ result, onReset }: AnalysisResultsProps) {
                       </div>
                       {recall.reportReceivedDate && (
                         <p className="text-xs text-gray-500 whitespace-nowrap">
-                          {new Date(recall.reportReceivedDate).toLocaleDateString()}
+                          {(() => {
+                            const date = new Date(recall.reportReceivedDate);
+                            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                            return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+                          })()}
                         </p>
                       )}
                     </div>
@@ -304,6 +317,34 @@ export function AnalysisResults({ result, onReset }: AnalysisResultsProps) {
         />
       )}
 
+      {/* Listing Description Analysis - Show for paid tier if analysis exists */}
+
+      {/* Maintenance Risk Assessment - Paid Only */}
+      {(() => {
+        const debugInfo = {
+          isFree,
+          tier: result.tier,
+          hasAssessment: !!result.maintenanceRiskAssessment,
+          assessment: result.maintenanceRiskAssessment,
+          vehicleInfoYear: result.vehicleInfo?.year,
+          vehicleInfoYearType: typeof result.vehicleInfo?.year
+        };
+        console.log('[Client] Maintenance Risk Card Debug:', JSON.stringify(debugInfo, null, 2));
+        console.log('[Client] Maintenance Risk Card Debug (object):', debugInfo);
+        return null;
+      })()}
+      {!isFree && result.maintenanceRiskAssessment && (
+        <MaintenanceRiskCard assessment={result.maintenanceRiskAssessment} />
+      )}
+
+      {/* Market Pricing Analysis - Paid Only */}
+      {!isFree && result.marketPricingAnalysis && result.vehicleInfo.askingPrice && (
+        <MarketPricingAnalysisCard 
+          analysis={result.marketPricingAnalysis} 
+          askingPrice={result.vehicleInfo.askingPrice}
+        />
+      )}
+
       {/* Seller Analysis - Paid Only */}
       {!isFree && result.sellerAnalysis && (
         <div className="bg-white p-6 md:p-8 rounded-xl border border-gray-200 shadow-sm">
@@ -336,8 +377,30 @@ export function AnalysisResults({ result, onReset }: AnalysisResultsProps) {
         </div>
       )}
 
-      {/* Questions to Ask */}
-      <QuestionsSection questions={result.questionsToAsk} tier={result.tier} />
+      {/* Questions to Ask - Different for free vs paid */}
+      {(() => {
+        console.log('[Client] Questions Debug:', {
+          isFree,
+          tier: result.tier,
+          hasTailoredQuestions: !!result.tailoredQuestions,
+          tailoredQuestionsCount: result.tailoredQuestions?.questions?.length || 0,
+          hasBasicQuestions: !!result.questionsToAsk,
+          basicQuestionsCount: result.questionsToAsk?.length || 0
+        });
+        return null;
+      })()}
+      {isFree ? (
+        <QuestionsSection questions={result.questionsToAsk} tier={result.tier} />
+      ) : (
+        result.tailoredQuestions && result.tailoredQuestions.questions && result.tailoredQuestions.questions.length > 0 ? (
+          <TailoredQuestionsCard analysis={result.tailoredQuestions} />
+        ) : (
+          // Fallback to basic questions if tailored questions aren't available
+          result.questionsToAsk && result.questionsToAsk.length > 0 && (
+            <QuestionsSection questions={result.questionsToAsk} tier={result.tier} />
+          )
+        )
+      )}
 
       {/* Upgrade Prompt - Show only for free tier */}
       {isFree && <UpgradePrompt />}

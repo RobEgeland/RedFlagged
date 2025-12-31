@@ -2,7 +2,7 @@ import DashboardNavbar from "@/components/dashboard-navbar";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { InfoIcon, UserCircle, History, FileText, Search, Zap } from "lucide-react";
 import { redirect } from "next/navigation";
-import { SubscriptionCheck } from "@/components/subscription-check";
+import { ReportsList } from "@/components/reports-list";
 import Link from "next/link";
 
 export default async function Dashboard() {
@@ -15,7 +15,7 @@ export default async function Dashboard() {
   const user = await currentUser();
 
   return (
-    <SubscriptionCheck>
+    <>
       <DashboardNavbar />
       <main className="w-full bg-background min-h-screen">
         <div className="container mx-auto px-4 py-8 flex flex-col gap-8">
@@ -41,13 +41,16 @@ export default async function Dashboard() {
               <p className="text-sm text-charcoal/60">Check a new vehicle deal</p>
             </Link>
 
-            <div className="p-6 bg-card border border-charcoal/10 rounded-lg opacity-60">
-              <div className="p-3 bg-charcoal/10 rounded-lg inline-block mb-3">
-                <History className="w-6 h-6 text-charcoal/60" />
+            <Link 
+              href="/dashboard#reports"
+              className="p-6 bg-card border border-charcoal/10 rounded-lg card-hover group"
+            >
+              <div className="p-3 bg-charcoal/10 rounded-lg inline-block mb-3 group-hover:bg-charcoal/20 transition-colors">
+                <History className="w-6 h-6 text-charcoal" />
               </div>
               <h3 className="font-display text-lg font-bold text-charcoal mb-1">Past Reports</h3>
-              <p className="text-sm text-charcoal/60">Coming soon</p>
-            </div>
+              <p className="text-sm text-charcoal/60">View your saved reports</p>
+            </Link>
 
             <div className="p-6 bg-card border border-charcoal/10 rounded-lg opacity-60">
               <div className="p-3 bg-charcoal/10 rounded-lg inline-block mb-3">
@@ -80,6 +83,20 @@ export default async function Dashboard() {
             </div>
           </section>
 
+          {/* Reports Section */}
+          <section id="reports" className="bg-card rounded-lg p-6 border border-charcoal/10">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-charcoal/10 rounded-lg">
+                <FileText className="w-6 h-6 text-charcoal" />
+              </div>
+              <div>
+                <h2 className="font-display font-semibold text-xl text-charcoal">Your Reports</h2>
+                <p className="text-sm text-charcoal/60">All your paid vehicle analysis reports</p>
+              </div>
+            </div>
+            <ReportsList userId={userId} />
+          </section>
+
           {/* User Profile Section */}
           <section className="bg-card rounded-lg p-6 border border-charcoal/10">
             <div className="flex items-center gap-4 mb-6">
@@ -92,6 +109,6 @@ export default async function Dashboard() {
           </section>
         </div>
       </main>
-    </SubscriptionCheck>
+    </>
   );
 }

@@ -49,24 +49,83 @@ async function locationToCounty(location?: string, zipCode?: string): Promise<st
 
 /**
  * Extract state from location string
+ * Handles both abbreviations (FL) and full names (Florida)
  */
 function extractState(location?: string): string | null {
   if (!location) return null;
   
-  // US state abbreviations
-  const stateAbbreviations = [
-    'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
-    'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
-    'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
-    'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
-    'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
-  ];
+  // US state abbreviations and full names mapping
+  const stateMap: Record<string, string> = {
+    'AL': 'AL', 'ALABAMA': 'AL',
+    'AK': 'AK', 'ALASKA': 'AK',
+    'AZ': 'AZ', 'ARIZONA': 'AZ',
+    'AR': 'AR', 'ARKANSAS': 'AR',
+    'CA': 'CA', 'CALIFORNIA': 'CA',
+    'CO': 'CO', 'COLORADO': 'CO',
+    'CT': 'CT', 'CONNECTICUT': 'CT',
+    'DE': 'DE', 'DELAWARE': 'DE',
+    'FL': 'FL', 'FLORIDA': 'FL',
+    'GA': 'GA', 'GEORGIA': 'GA',
+    'HI': 'HI', 'HAWAII': 'HI',
+    'ID': 'ID', 'IDAHO': 'ID',
+    'IL': 'IL', 'ILLINOIS': 'IL',
+    'IN': 'IN', 'INDIANA': 'IN',
+    'IA': 'IA', 'IOWA': 'IA',
+    'KS': 'KS', 'KANSAS': 'KS',
+    'KY': 'KY', 'KENTUCKY': 'KY',
+    'LA': 'LA', 'LOUISIANA': 'LA',
+    'ME': 'ME', 'MAINE': 'ME',
+    'MD': 'MD', 'MARYLAND': 'MD',
+    'MA': 'MA', 'MASSACHUSETTS': 'MA',
+    'MI': 'MI', 'MICHIGAN': 'MI',
+    'MN': 'MN', 'MINNESOTA': 'MN',
+    'MS': 'MS', 'MISSISSIPPI': 'MS',
+    'MO': 'MO', 'MISSOURI': 'MO',
+    'MT': 'MT', 'MONTANA': 'MT',
+    'NE': 'NE', 'NEBRASKA': 'NE',
+    'NV': 'NV', 'NEVADA': 'NV',
+    'NH': 'NH', 'NEW HAMPSHIRE': 'NH',
+    'NJ': 'NJ', 'NEW JERSEY': 'NJ',
+    'NM': 'NM', 'NEW MEXICO': 'NM',
+    'NY': 'NY', 'NEW YORK': 'NY',
+    'NC': 'NC', 'NORTH CAROLINA': 'NC',
+    'ND': 'ND', 'NORTH DAKOTA': 'ND',
+    'OH': 'OH', 'OHIO': 'OH',
+    'OK': 'OK', 'OKLAHOMA': 'OK',
+    'OR': 'OR', 'OREGON': 'OR',
+    'PA': 'PA', 'PENNSYLVANIA': 'PA',
+    'RI': 'RI', 'RHODE ISLAND': 'RI',
+    'SC': 'SC', 'SOUTH CAROLINA': 'SC',
+    'SD': 'SD', 'SOUTH DAKOTA': 'SD',
+    'TN': 'TN', 'TENNESSEE': 'TN',
+    'TX': 'TX', 'TEXAS': 'TX',
+    'UT': 'UT', 'UTAH': 'UT',
+    'VT': 'VT', 'VERMONT': 'VT',
+    'VA': 'VA', 'VIRGINIA': 'VA',
+    'WA': 'WA', 'WASHINGTON': 'WA',
+    'WV': 'WV', 'WEST VIRGINIA': 'WV',
+    'WI': 'WI', 'WISCONSIN': 'WI',
+    'WY': 'WY', 'WYOMING': 'WY'
+  };
   
-  // Try to find state abbreviation in location
+  // Try to find state abbreviation or full name in location
   const upperLocation = location.toUpperCase();
-  for (const state of stateAbbreviations) {
-    if (upperLocation.includes(state)) {
-      return state;
+  
+  // First try abbreviations (2-letter codes)
+  for (const [key, value] of Object.entries(stateMap)) {
+    if (key.length === 2 && upperLocation.includes(key)) {
+      return value;
+    }
+  }
+  
+  // Then try full state names (longer matches first)
+  const sortedEntries = Object.entries(stateMap)
+    .filter(([key]) => key.length > 2)
+    .sort(([a], [b]) => b.length - a.length);
+  
+  for (const [key, value] of sortedEntries) {
+    if (upperLocation.includes(key)) {
+      return value;
     }
   }
   

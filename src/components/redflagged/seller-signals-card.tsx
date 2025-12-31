@@ -157,11 +157,11 @@ export function SellerSignalsCard({
                           <span>
                             <span className="font-semibold">${entry.price.toLocaleString()}</span>
                             {' on '}
-                            <span>{new Date(entry.date).toLocaleDateString('en-US', { 
-                              year: 'numeric', 
-                              month: 'short', 
-                              day: 'numeric' 
-                            })}</span>
+                            <span>{(() => {
+                              const date = new Date(entry.date);
+                              const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                              return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+                            })()}</span>
                           </span>
                         </li>
                       ))}

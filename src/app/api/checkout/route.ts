@@ -41,8 +41,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: "payment", // One-time payment
-      success_url: `${request.nextUrl.origin}/success?session_id={CHECKOUT_SESSION_ID}&report_id=${reportId || "unknown"}`,
-      cancel_url: `${request.nextUrl.origin}?canceled=true`,
+      success_url: `${request.nextUrl.origin}/report?session_id={CHECKOUT_SESSION_ID}&report_id=${reportId || "unknown"}`,
+      cancel_url: `${request.nextUrl.origin}/report?canceled=true`,
       customer_email: email || undefined,
       metadata: {
         reportId: reportId || "unknown",

@@ -6,7 +6,7 @@ export const createClient = async () => {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   // If Supabase is not configured, return a mock client that won't cause errors
-  if (!supabaseUrl || !supabaseAnonKey) {
+  if (!supabaseUrl || !supabaseAnonKey || supabaseAnonKey === 'your_supabase_anon_key_here') {
     // Create a chainable mock query builder
     const createMockQueryBuilder = () => {
       const builder = {

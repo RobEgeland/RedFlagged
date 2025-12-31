@@ -2,8 +2,13 @@
 
 import { SignIn } from "@clerk/nextjs";
 import Navbar from "@/components/navbar";
+import { useSearchParams } from "next/navigation";
 
 export default function SignInPage() {
+  const searchParams = useSearchParams();
+  const redirectParam = searchParams.get("redirect");
+  const redirectUrl = redirectParam ? decodeURIComponent(redirectParam) : undefined;
+
   return (
     <>
       <Navbar />
@@ -17,7 +22,9 @@ export default function SignInPage() {
           }}
           routing="path"
           path="/sign-in"
-          signUpUrl="/sign-up"
+          signUpUrl={redirectUrl ? `/sign-up?redirect=${encodeURIComponent(redirectUrl)}` : "/sign-up"}
+          afterSignInUrl={redirectUrl || "/"}
+          afterSignUpUrl={redirectUrl || "/"}
         />
       </div>
     </>

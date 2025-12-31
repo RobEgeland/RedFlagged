@@ -27,19 +27,6 @@ export function QuestionsSection({ questions, tier = 'free' }: QuestionsSectionP
 
   return (
     <div className="bg-gray-50 rounded-lg p-6 md:p-8 border-l-4 border-gray-900 animate-fade-in-up relative">
-      {/* Lock overlay for free tier */}
-      {isFree && (
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-900/5 to-gray-900/10 backdrop-blur-[2px] z-10 rounded-lg flex items-center justify-center">
-          <div className="bg-white px-6 py-3 rounded-lg shadow-lg flex flex-col items-center gap-2">
-            <div className="flex items-center gap-2">
-              <Lock className="w-5 h-5 text-gray-600" />
-              <span className="text-lg font-semibold text-gray-900">Full Questions List</span>
-            </div>
-            <p className="text-sm text-gray-600">Upgrade to see all questions</p>
-          </div>
-        </div>
-      )}
-      
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
@@ -51,7 +38,7 @@ export function QuestionsSection({ questions, tier = 'free' }: QuestionsSectionP
               Questions to Ask
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              {isFree ? 'Starter question' : 'Use these when talking to the seller'}
+              {isFree ? 'Essential questions to ask the seller' : 'Use these when talking to the seller'}
             </p>
           </div>
         </div>
@@ -92,13 +79,11 @@ export function QuestionsSection({ questions, tier = 'free' }: QuestionsSectionP
       </ol>
 
       {/* Tip */}
-      {!isFree && (
         <div className="mt-6 pt-4 border-t border-gray-200">
           <p className="text-xs text-gray-500">
-            💡 Tip: Screenshot or copy these questions to have them ready when you meet the seller.
+          💡 Tip: {isFree ? 'These essential questions help you verify key information. Upgrade for a complete list of contextual questions.' : 'Screenshot or copy these questions to have them ready when you meet the seller.'}
           </p>
         </div>
-      )}
     </div>
   );
 }

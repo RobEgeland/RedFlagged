@@ -153,6 +153,7 @@ export function VinInputForm({ onSubmit, isLoading }: VinInputFormProps) {
     setLocation(e.target.value);
   };
 
+
   // Helper to check if price is valid
   const isPriceValid = () => {
     if (!askingPrice || askingPrice.trim().length === 0) {
@@ -191,7 +192,7 @@ export function VinInputForm({ onSubmit, isLoading }: VinInputFormProps) {
       const vinValid = validateVin(vin);
       console.log('[Form Validation] VIN check:', { vin, length: vin.length, isValid: vinValid });
       if (!vinValid) {
-        return false;
+      return false;
       }
     }
 
@@ -420,6 +421,7 @@ export function VinInputForm({ onSubmit, isLoading }: VinInputFormProps) {
               Helps check for flood, hurricane, or wildfire damage history
             </p>
           </div>
+
 
           {/* Asking Price */}
           <div className="space-y-2">

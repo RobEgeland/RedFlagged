@@ -5,6 +5,11 @@ import { fetchAllDisasterData, analyzeDisasterRisk } from './services/disaster-g
 import { analyzeAllSellerSignals, calculateSellerCredibilityScore, analyzeUnusuallyLowPrice, analyzeTooGoodForTooLong } from './services/seller-signals';
 import { fetchVehicleRecalls, VehicleRecall } from './services/vehicle-recalls';
 import { analyzeEnvironmentalRisk } from './services/environmental-risk';
+import { assessDataQuality } from './services/data-quality';
+import { assembleVerdict } from './services/verdict-assembly';
+import { assessMaintenanceRisk, estimateVehicleClass } from './services/maintenance-risk-assessment';
+import { analyzeMarketPricing } from './services/market-pricing-analysis';
+import { generateTailoredQuestions } from './services/tailored-questions';
 
 // Mock vehicle database for demo purposes
 const vehicleData: Record<string, { make: string; model: string; year: number; avgValue: number }> = {
@@ -133,10 +138,9 @@ function generateRedFlagsFromAllData(
         : `This vehicle is listed significantly above market value. The asking price is $${Math.abs(priceDiff).toLocaleString()} more than comparable vehicles.`,
       severity: priceDiffPercent > 30 ? 'critical' : priceDiffPercent > 20 ? 'high' : 'medium',
       category: 'pricing',
-      expandedDetails: tier === 'paid' ? `Based on current market data from Edmunds, KBB, Auto.dev, and MarketCheck, similar vehicles in comparable condition typically sell for 15-20% less than this asking price.` : undefined,
+      expandedDetails: tier === 'paid' ? `Based on current market data from Auto.dev listings and MarketCheck, similar vehicles in comparable condition typically sell for 15-20% less than this asking price.` : undefined,
       methodology: tier === 'paid' ? 'Compared against average retail prices from multiple market data sources.' : undefined,
-      isPremium: tier === 'free',
-      dataSource: tier === 'paid' ? 'Market Listings Data (Edmunds, KBB, Auto.dev, MarketCheck)' : undefined
+      dataSource: tier === 'paid' ? 'Market Listings Data (Auto.dev, MarketCheck)' : undefined
     });
   } else if (priceDiffPercent < -20) {
     flags.push({
@@ -149,7 +153,6 @@ function generateRedFlagsFromAllData(
       category: 'pricing',
       expandedDetails: tier === 'paid' ? `Vehicles priced this far below market often have undisclosed issues like salvage titles, flood damage, or major mechanical problems. Proceed with extra caution.` : undefined,
       methodology: tier === 'paid' ? 'Compared against average retail prices from multiple market data sources.' : undefined,
-      isPremium: tier === 'free',
       dataSource: tier === 'paid' ? 'Market Listings Data' : undefined
     });
   }
@@ -180,7 +183,7 @@ function generateRedFlagsFromAllData(
       category: 'pricing',
       expandedDetails: `The asking price of $${lowPrice.askingPrice.toLocaleString()} is ${belowPercent.toFixed(1)}% below the market ${lowPrice.marketMedian ? 'median' : 'estimated value'} of $${((lowPrice.askingPrice / (1 + lowPrice.belowMarketPercent / 100))).toLocaleString()}. This is a probabilistic pricing behavior signal, not proof of seller intent or vehicle damage. When combined with other risk signals (seller behavior, flood exposure, data gaps), it may indicate elevated risk. Confidence: ${lowPrice.confidence}%.`,
       methodology: `Compared asking price against market median and estimated value from multiple data sources. Threshold: ${lowPrice.thresholdUsed}% below market.`,
-      dataSource: 'Market Listings Data (Auto.dev, Edmunds, KBB, MarketCheck)'
+      dataSource: 'Market Listings Data (Auto.dev, MarketCheck)'
     });
   }
   
@@ -225,7 +228,6 @@ function generateRedFlagsFromAllData(
         severity: 'critical',
         category: 'title',
         expandedDetails: tier === 'paid' ? `Title brands indicate the vehicle has been damaged, salvaged, or otherwise compromised. Insurance may be difficult to obtain, and resale value is permanently affected.` : undefined,
-        isPremium: tier === 'free',
         dataSource: 'NMVTIS Database'
       });
     }
@@ -330,7 +332,6 @@ function generateRedFlagsFromAllData(
         severity: disasterRisk.riskLevel === 'high' ? 'high' : 'medium',
         category: 'disaster',
         expandedDetails: tier === 'paid' ? disasterRisk.details.join(' ') : undefined,
-        isPremium: tier === 'free',
         dataSource: tier === 'paid' ? 'FEMA, NOAA, USGS' : 'FEMA'
       });
     }
@@ -387,7 +388,7 @@ function generateRedFlagsFromAllData(
         description = `${changes} price change${changes === 1 ? '' : 's'} detected within 90 days.`;
       }
       
-      flags.push({
+        flags.push({
         id: 'price-volatility',
         title,
         description,
@@ -395,7 +396,7 @@ function generateRedFlagsFromAllData(
         category: 'listing',
         expandedDetails: `Price volatility may indicate issues discovered during inspections or failed deals. This is a behavioral risk signal, not proof of a problem. Multiple price drops or oscillations suggest the seller may be adjusting price in response to buyer concerns.`,
         dataSource: 'Price Behavior Analysis'
-      });
+        });
     }
     
     if (sellerSignals.pricingBehavior?.tooGoodTooBeLong?.isSuspicious) {
@@ -433,8 +434,7 @@ function generateRedFlagsFromAllData(
         : 'Without a VIN, we cannot verify vehicle history, recalls, or title status. This significantly limits our analysis.',
       severity: 'high',
       category: 'data-gap',
-      expandedDetails: tier === 'paid' ? 'The Vehicle Identification Number (VIN) is essential for accessing NMVTIS data, recall information, and verifying the vehicle is not stolen. Always obtain the VIN before proceeding.' : undefined,
-      isPremium: tier === 'free'
+      expandedDetails: tier === 'paid' ? 'The Vehicle Identification Number (VIN) is essential for accessing NMVTIS data, recall information, and verifying the vehicle is not stolen. Always obtain the VIN before proceeding.' : undefined
     });
   }
   
@@ -463,8 +463,7 @@ function generateRedFlagsFromAllData(
           : `This vehicle has ${mileage.toLocaleString()} miles, which is ${Math.round((mileage / expectedMileage - 1) * 100)}% higher than average for its age.`,
         severity: mileage > expectedMileage * 2 ? 'high' : 'medium',
         category: 'ownership',
-        expandedDetails: tier === 'paid' ? 'High mileage vehicles may have more wear on critical components. Ensure timing belt/chain service has been performed if applicable, and check for oil leaks.' : undefined,
-        isPremium: tier === 'free'
+        expandedDetails: tier === 'paid' ? 'High mileage vehicles may have more wear on critical components. Ensure timing belt/chain service has been performed if applicable, and check for oil leaks.' : undefined
       });
     } else if (mileage < expectedMileage * 0.4 && age > 3) {
       flags.push({
@@ -475,8 +474,7 @@ function generateRedFlagsFromAllData(
           : `Only ${mileage.toLocaleString()} miles on a ${age}-year-old vehicle is suspicious. This could indicate odometer tampering or extended storage.`,
         severity: 'medium',
         category: 'history',
-        expandedDetails: tier === 'paid' ? 'While genuinely low-mileage vehicles exist, be cautious. Vehicles that sat unused can develop issues like dried seals, degraded fluids, and battery problems. Verify the odometer reading matches service records.' : undefined,
-        isPremium: tier === 'free'
+        expandedDetails: tier === 'paid' ? 'While genuinely low-mileage vehicles exist, be cautious. Vehicles that sat unused can develop issues like dried seals, degraded fluids, and battery problems. Verify the odometer reading matches service records.' : undefined
       });
     }
   }
@@ -612,8 +610,28 @@ function determineVerdict(flags: RedFlag[], priceDiffPercent: number): { verdict
 
 function generateQuestionsWithTier(flags: RedFlag[], priceDiff: number, tier: AnalysisTier = 'free'): string[] {
   if (tier === 'free') {
-    // Free tier gets only 1 question
-    return ['Can I see the title?'];
+    // Free tier gets 1-2 essential questions based on key flags
+    const questions: string[] = [];
+    const flagIds = new Set(flags.map(f => f.id));
+    
+    // Always include title question (most important)
+    questions.push('Can I see the title? Is it clean, or does it have any brands (salvage, rebuilt, lemon)?');
+    
+    // Add one more essential question based on highest priority flag
+    if (flagIds.has('title-brands') || flagIds.has('theft-record')) {
+      questions.push('Has this vehicle ever been in an accident or had any insurance claims?');
+    } else if (flagIds.has('overpriced') || priceDiff > 0) {
+      questions.push(`I've seen similar vehicles listed for $${Math.abs(priceDiff).toLocaleString()} less. What justifies your price?`);
+    } else if (flagIds.has('underpriced')) {
+      questions.push('This price seems lower than market value. Is there anything wrong with the vehicle I should know about?');
+    } else if (flagIds.has('environmental-risk')) {
+      questions.push('Has this vehicle ever been exposed to flooding or water damage?');
+    } else {
+      // Default second question
+      questions.push('Why are you selling the vehicle?');
+    }
+    
+    return questions;
   }
   
   // Paid tier uses the full generateQuestions function
@@ -666,7 +684,7 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
   });
   
   try {
-    const tier = request.tier || 'free';
+  const tier = request.tier || 'free';
   
   let vehicleInfo = {
     vin: request.vin,
@@ -698,33 +716,63 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
     };
   }
   
-  // Fetch all data sources in parallel
+  // Fetch vehicle history FIRST if VIN is provided, so we can get vehicle details for market data
+  let vehicleHistory = { nmvtis: null, carfax: null };
+  if (request.vin) {
+    try {
+      const nmvtis = await fetchNMVTISData(request.vin);
+      const carfax = tier === 'paid' ? await fetchCarfaxAutoCheckData(request.vin) : null;
+      vehicleHistory = { nmvtis, carfax };
+    } catch (error: any) {
+      // If it's a VIN validation error (400), re-throw it so the user sees the error
+      // For other errors, log and continue without history data
+      if (error?.message && (error.message.includes('Invalid VIN') || error.message.includes('VIN must be'))) {
+        throw error; // Re-throw VIN validation errors
+      }
+      console.error('[Analysis] Error fetching vehicle history:', error);
+      vehicleHistory = { nmvtis: null, carfax: null };
+    }
+  }
+  
+  // Update vehicleInfo with data from Auto.dev if available (prefer Auto.dev data)
+  // This ensures we have year/make/model for market data fetching
+  if (vehicleHistory?.nmvtis?.vehicleDetails) {
+    const autoDevDetails = vehicleHistory.nmvtis.vehicleDetails;
+    vehicleInfo = {
+      ...vehicleInfo,
+      // Prefer Auto.dev data as it's more accurate from VIN decode
+      // But keep manual year entry if Auto.dev doesn't provide year
+      year: autoDevDetails.year || vehicleInfo.year || request.year,
+      make: autoDevDetails.make || vehicleInfo.make,
+      model: autoDevDetails.model || vehicleInfo.model,
+      trim: autoDevDetails.trim || vehicleInfo.trim,
+    };
+    console.log('[Analysis] Updated vehicleInfo from Auto.dev for market data:', { 
+      year: vehicleInfo.year, 
+      make: vehicleInfo.make, 
+      model: vehicleInfo.model 
+    });
+  } else {
+    console.log('[Analysis] No Auto.dev vehicle details, using manual entry for market data:', { 
+      year: vehicleInfo.year, 
+      make: vehicleInfo.make, 
+      model: vehicleInfo.model 
+    });
+  }
+
+  // Now fetch all remaining data sources in parallel
   const dataFetchPromises: Promise<any>[] = [];
   
-  // Vehicle history (Free: NMVTIS, Premium: + Carfax/AutoCheck)
-  let vehicleHistoryPromise = Promise.resolve({ nmvtis: null, carfax: null });
-  if (request.vin) {
-    vehicleHistoryPromise = (async () => {
-      try {
-        const nmvtis = await fetchNMVTISData(request.vin!);
-        const carfax = tier === 'paid' ? await fetchCarfaxAutoCheckData(request.vin!) : null;
-        return { nmvtis, carfax };
-      } catch (error: any) {
-        // If it's a VIN validation error (400), re-throw it so the user sees the error
-        // For other errors, log and continue without history data
-        if (error?.message && (error.message.includes('Invalid VIN') || error.message.includes('VIN must be'))) {
-          throw error; // Re-throw VIN validation errors
-        }
-        console.error('[Analysis] Error fetching vehicle history:', error);
-        return { nmvtis: null, carfax: null };
-      }
-    })();
-  }
-  dataFetchPromises.push(vehicleHistoryPromise);
-
-  // Market listings data
+  // Market listings data - now we have vehicle details from VIN decode
   let marketDataPromise = Promise.resolve(null);
   if (vehicleInfo.year && vehicleInfo.make && vehicleInfo.model) {
+    console.log('[Analysis] Fetching market data for:', { 
+      year: vehicleInfo.year, 
+      make: vehicleInfo.make, 
+      model: vehicleInfo.model, 
+      trim: vehicleInfo.trim,
+      mileage: vehicleInfo.mileage 
+    });
     marketDataPromise = fetchAllMarketData(
       vehicleInfo.year,
       vehicleInfo.make,
@@ -733,6 +781,12 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
       tier,
       vehicleInfo.trim
     );
+  } else {
+    console.warn('[Analysis] Skipping market data fetch - missing vehicle details:', {
+      hasYear: !!vehicleInfo.year,
+      hasMake: !!vehicleInfo.make,
+      hasModel: !!vehicleInfo.model
+    });
   }
   dataFetchPromises.push(marketDataPromise);
   
@@ -757,8 +811,57 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
   }
   dataFetchPromises.push(sellerSignalsPromise);
   
-  // Wait for all data to be fetched
-  const [vehicleHistory, marketData, disasterData, environmentalRisk, sellerSignals] = await Promise.all(dataFetchPromises);
+  // Wait for all remaining data to be fetched (vehicleHistory was already fetched above)
+  const [marketData, disasterData, environmentalRisk, sellerSignals] = await Promise.all(dataFetchPromises);
+  
+  // Maintenance risk assessment (Premium only) - runs after vehicleHistory is available
+  let maintenanceRiskAssessment: any = null;
+  if (tier === 'paid') {
+    // Extract ownership history from vehicle history if available
+    const ownershipHistory = vehicleHistory?.carfax?.ownershipChanges !== undefined
+      ? { ownerCount: vehicleHistory.carfax.ownershipChanges, ownershipChanges: vehicleHistory.carfax.ownershipChanges }
+      : undefined;
+    
+    const vehicleClass = estimateVehicleClass(vehicleInfo.make, vehicleInfo.model);
+    
+    // Use vehicleInfo.year, fallback to request.year if not available
+    // Ensure year is a number (convert string to number if needed)
+    const rawYear = vehicleInfo.year || request.year;
+    const assessmentYear = typeof rawYear === 'string' ? parseInt(rawYear, 10) : rawYear;
+    const assessmentMileage = vehicleInfo.mileage || request.mileage;
+    
+    console.log('[Analysis] Assessing maintenance risk:', {
+      vehicleInfoYear: vehicleInfo.year,
+      vehicleInfoYearType: typeof vehicleInfo.year,
+      requestYear: request.year,
+      requestYearType: typeof request.year,
+      rawYear,
+      rawYearType: typeof rawYear,
+      assessmentYear,
+      assessmentYearType: typeof assessmentYear,
+      isNaN: isNaN(assessmentYear as number),
+      mileage: assessmentMileage,
+      vehicleClass,
+      ownershipChanges: vehicleHistory?.carfax?.ownershipChanges
+    });
+    
+    maintenanceRiskAssessment = assessMaintenanceRisk(
+      assessmentYear,
+      assessmentMileage,
+      ownershipHistory,
+      vehicleClass
+    );
+    
+    console.log('[Analysis] Maintenance risk assessment result:', {
+      hasAssessment: !!maintenanceRiskAssessment,
+      overallRisk: maintenanceRiskAssessment?.overallRisk,
+      riskFactorsCount: maintenanceRiskAssessment?.riskFactors?.length || 0,
+      inspectionFocusCount: maintenanceRiskAssessment?.inspectionFocus?.length || 0,
+      fullAssessment: maintenanceRiskAssessment
+    });
+  } else {
+    console.log('[Analysis] Maintenance risk assessment skipped - not paid tier');
+  }
   
   // Log seller signals for debugging
   console.log('[Analysis] Seller signals result:', {
@@ -786,6 +889,13 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
     console.log('[Analysis] No Auto.dev vehicle details, using manual entry:', { year: vehicleInfo.year, make: vehicleInfo.make, model: vehicleInfo.model });
   }
   
+  // Log market data for debugging
+  console.log('[Analysis] Market data result:', {
+    hasMarketData: !!marketData,
+    hasAutoDev: !!marketData?.autoDev,
+    hasMarketCheck: !!marketData?.marketCheck
+  });
+  
   // Fetch vehicle recalls using make/model/year (after we have vehicle details from Auto.dev or manual entry)
   let recalls: VehicleRecall[] | null = null;
   if (vehicleInfo.year && vehicleInfo.make && vehicleInfo.model) {
@@ -806,13 +916,13 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
   let estimatedValue: number;
   let marketMedian: number | undefined;
   if (marketData && Object.keys(marketData).length > 0) {
+    console.log('[Analysis] Calculating market value from market data...');
     estimatedValue = calculateAverageMarketValue(marketData);
+    console.log('[Analysis] Calculated estimatedValue from market data:', estimatedValue);
     
     // Calculate market median from available market data sources
     const marketValues: number[] = [];
     if (marketData.autoDev?.marketAverage) marketValues.push(marketData.autoDev.marketAverage);
-    if (marketData.edmundsAPI) marketValues.push(marketData.edmundsAPI.trueMarketValue);
-    if (marketData.kelleyBlueBook) marketValues.push(marketData.kelleyBlueBook.fairPurchasePrice);
     if (marketData.marketCheck) marketValues.push(marketData.marketCheck.competitivePrice);
     
     if (marketValues.length > 0) {
@@ -824,10 +934,20 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
     }
   } else {
     // Fallback to legacy calculation
+    console.log('[Analysis] No market data available, using fallback calculation');
     estimatedValue = vehicleInfo.make && vehicleInfo.model && vehicleInfo.year
       ? getEstimatedValue(vehicleInfo.make, vehicleInfo.model, vehicleInfo.year, vehicleInfo.mileage)
       : request.askingPrice * 0.95;
+    console.log('[Analysis] Fallback estimatedValue:', estimatedValue, {
+      make: vehicleInfo.make,
+      model: vehicleInfo.model,
+      year: vehicleInfo.year,
+      mileage: vehicleInfo.mileage,
+      askingPrice: request.askingPrice,
+    });
   }
+  
+  console.log('[Analysis] Final estimatedValue before price calculations:', estimatedValue);
   
   const priceDiff = request.askingPrice - estimatedValue;
   const priceDiffPercent = Math.round((priceDiff / estimatedValue) * 100);
@@ -893,40 +1013,7 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
   // Generate questions with tier awareness
   const questionsToAsk = generateQuestionsWithTier(redFlags, priceDiff, tier);
   
-  // Determine verdict
-  const { verdict, confidence } = determineVerdict(redFlags, priceDiffPercent);
-  
-  // Generate summary
-  let summary: string;
-  if (tier === 'free') {
-    switch (verdict) {
-      case 'deal':
-        summary = `This appears to be worth considering. Upgrade to see full analysis.`;
-        break;
-      case 'caution':
-        summary = `We found concerns. Upgrade for detailed analysis.`;
-        break;
-      case 'disaster':
-        summary = `Multiple red flags detected. Upgrade for full details.`;
-        break;
-    }
-  } else {
-    switch (verdict) {
-      case 'deal':
-        summary = priceDiffPercent < 0 
-          ? `This appears to be a solid deal. The asking price is ${Math.abs(priceDiffPercent)}% below market value, and we found no major red flags.`
-          : `This vehicle is priced reasonably for its condition. While there are some minor concerns to address, the overall risk level is low.`;
-        break;
-      case 'caution':
-        summary = `Proceed with caution. We found ${redFlags.filter(f => f.severity !== 'low').length} concerns that warrant further investigation before committing to this purchase.`;
-        break;
-      case 'disaster':
-        summary = `We strongly recommend walking away. Multiple serious red flags suggest this deal carries significant risk. The combination of pricing and data gaps makes this a poor choice.`;
-        break;
-    }
-  }
-  
-  // Build known and unknown data
+  // Build known and unknown data (needed for preliminary result)
   const knownData: string[] = [];
   const unknownData: string[] = [];
   
@@ -948,10 +1035,8 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
   if (vehicleInfo.mileage) knownData.push(`Mileage: ${vehicleInfo.mileage.toLocaleString()}`);
   
   if (marketData) {
-    if (marketData.edmundsAPI) knownData.push('Edmunds market pricing');
-    if (marketData.kelleyBlueBook) knownData.push('Kelley Blue Book pricing');
+    if (marketData.autoDev) knownData.push('Auto.dev market listings');
     if (tier === 'paid') {
-      if (marketData.autoDev) knownData.push('Auto.dev market analysis');
       if (marketData.marketCheck) knownData.push('MarketCheck competitive pricing');
     }
   }
@@ -982,7 +1067,77 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
     unknownData.push('Theft records');
   }
   
-  // Build result
+  // Build preliminary result for data quality assessment
+  const preliminaryResult: VerdictResult = {
+    tier,
+    verdict: 'caution', // Placeholder, will be updated
+    confidenceScore: 75, // Placeholder, will be updated
+    summary: '', // Placeholder, will be updated
+    redFlags,
+    questionsToAsk,
+    knownData,
+    unknownData,
+    vehicleInfo: {
+      ...vehicleInfo,
+      estimatedValue,
+      priceDifference: priceDiff,
+      priceDifferencePercent: priceDiffPercent,
+    },
+    vehicleHistory: vehicleHistory ? {
+      nmvtis: vehicleHistory.nmvtis || undefined,
+      carfaxAutoCheck: vehicleHistory.carfax || undefined,
+    } : undefined,
+    marketData: marketData || undefined,
+    disasterData: disasterData || undefined,
+    environmentalRisk: environmentalRisk || undefined,
+    sellerSignals: updatedSellerSignals || undefined,
+    maintenanceRiskAssessment: maintenanceRiskAssessment || undefined,
+    recalls: recalls && recalls.length > 0 ? recalls : undefined
+  };
+  
+  // Assess data quality first (needed for verdict assembly)
+  const dataQuality = assessDataQuality(request, preliminaryResult);
+  
+  // Determine verdict using new assembly system
+  const verdictReasoning = assembleVerdict(redFlags, dataQuality);
+  const verdict = verdictReasoning.verdict;
+  const confidence = verdictReasoning.confidence;
+  
+  // Generate summary using verdict reasoning explanation
+  // Free tier gets complete decision-making explanation, paid tier gets expanded context
+  let summary: string;
+  if (tier === 'free') {
+    // Free tier: Use verdict reasoning explanation (complete but concise)
+    summary = verdictReasoning.explanation;
+    
+    // Add price context if available and relevant
+    if (verdict === 'deal' && priceDiffPercent < 0 && priceDiffPercent !== undefined) {
+      summary = `This appears to be a solid deal. The asking price is ${Math.abs(priceDiffPercent).toFixed(0)}% below market value. ${summary}`;
+    } else if (verdict === 'deal' && priceDiffPercent !== undefined && priceDiffPercent > 0 && priceDiffPercent < 15) {
+      summary = `This vehicle is priced reasonably. ${summary}`;
+    } else if (verdict === 'caution' && priceDiffPercent !== undefined && priceDiffPercent > 15) {
+      summary = `Priced ${priceDiffPercent.toFixed(0)}% above market. ${summary}`;
+    }
+  } else {
+    // Paid tier: Enhanced explanation with detailed context
+    summary = verdictReasoning.explanation;
+    
+    // Enhance with detailed price context
+    if (verdict === 'deal' && priceDiffPercent < 0) {
+      summary = `This appears to be a solid deal. The asking price is ${Math.abs(priceDiffPercent).toFixed(1)}% below market value. ${summary}`;
+    } else if (verdict === 'deal' && priceDiffPercent > 0 && priceDiffPercent < 15) {
+      summary = `This vehicle is priced reasonably. ${summary}`;
+    } else if (verdict === 'caution' && priceDiffPercent > 15) {
+      summary = `Priced ${priceDiffPercent.toFixed(1)}% above market value. ${summary}`;
+    }
+    
+    // Add data quality context for paid tier
+    if (dataQuality && dataQuality.overallConfidence === 'low') {
+      summary = `${summary} Note: Limited data quality may affect confidence in this assessment.`;
+    }
+  }
+  
+  // Build final result with verdict and data quality
   const result: VerdictResult = {
     tier,
     verdict,
@@ -1006,6 +1161,9 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
     disasterData: disasterData || undefined,
     environmentalRisk: environmentalRisk || undefined,
     sellerSignals: updatedSellerSignals || undefined,
+    maintenanceRiskAssessment: maintenanceRiskAssessment || undefined,
+    marketPricingAnalysis: undefined, // Will be added in premium features section below
+    tailoredQuestions: undefined, // Will be added in premium features section below
     recalls: recalls && recalls.length > 0 ? recalls : undefined
   };
   
@@ -1014,6 +1172,31 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
     hasRecalls: !!result.recalls,
     recallCount: result.recalls?.length || 0,
     recalls: result.recalls
+  });
+  
+  // Log maintenance risk assessment in result for debugging
+  console.log('[Analysis] Maintenance risk assessment in final result:', {
+    hasAssessment: !!result.maintenanceRiskAssessment,
+    overallRisk: result.maintenanceRiskAssessment?.overallRisk,
+    riskFactorsCount: result.maintenanceRiskAssessment?.riskFactors?.length || 0,
+    inspectionFocusCount: result.maintenanceRiskAssessment?.inspectionFocus?.length || 0,
+    tier: result.tier
+  });
+  
+  // Data quality already assessed above, add to result
+  result.dataQuality = dataQuality;
+  console.log('[Analysis] Data quality assessment:', {
+    overallConfidence: dataQuality.overallConfidence,
+    confidenceScore: dataQuality.confidenceScore,
+    factorsCount: dataQuality.factors.length
+  });
+  console.log('[Analysis] Verdict reasoning:', {
+    verdict: verdictReasoning.verdict,
+    confidence: verdictReasoning.confidence,
+    structuralRisks: verdictReasoning.structuralRisks.length,
+    marketRisks: verdictReasoning.marketRisks.length,
+    sellerBehaviorRisks: verdictReasoning.sellerBehaviorRisks.length,
+    dataQualityImpact: verdictReasoning.dataQualityImpact
   });
   
   // Add premium computed features
@@ -1031,11 +1214,43 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
       result.comparableListings = generateComparableListings(marketData, estimatedValue, vehicleInfo.mileage);
     }
     
+    // Market pricing analysis (detailed pricing context)
+    if (marketData && vehicleInfo.askingPrice) {
+      const rawListings = marketData.autoDev?.rawListings;
+      const pricingAnalysis = analyzeMarketPricing(
+        marketData,
+        vehicleInfo.askingPrice,
+        request.location,
+        rawListings
+      );
+      
+      if (pricingAnalysis) {
+        result.marketPricingAnalysis = pricingAnalysis;
+        console.log('[Analysis] Market pricing analysis generated:', {
+          hasAnalysis: !!pricingAnalysis,
+          comparableCount: pricingAnalysis.comparableCount,
+          askingPricePercentile: pricingAnalysis.askingPricePosition.percentile,
+          negotiationLeverage: pricingAnalysis.negotiationLeverage.level
+        });
+      }
+    }
+    
     // Seller analysis
     if (sellerSignals) {
       const credibility = calculateSellerCredibilityScore(sellerSignals);
       result.sellerAnalysis = credibility;
     }
+    
+    // Tailored questions (comprehensive, report-specific questions)
+    const tailoredQuestions = generateTailoredQuestions(result);
+    result.tailoredQuestions = tailoredQuestions;
+    console.log('[Analysis] Tailored questions generated:', {
+      totalQuestions: tailoredQuestions.questions.length,
+      critical: tailoredQuestions.categories.critical.length,
+      high: tailoredQuestions.categories.high.length,
+      medium: tailoredQuestions.categories.medium.length,
+      low: tailoredQuestions.categories.low.length
+    });
   }
   
   return result;
