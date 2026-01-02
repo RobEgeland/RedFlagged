@@ -60,8 +60,8 @@ export function AnalysisResults({ result, onReset }: AnalysisResultsProps) {
         tier={result.tier}
       />
 
-      {/* Vehicle Information */}
-      {(vehicleName || result.vehicleInfo.vin) && (
+      {/* Vehicle Information - Paid Only */}
+      {!isFree && (vehicleName || result.vehicleInfo.vin) && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 md:p-8 animate-fade-in-up">
           <div className="space-y-4">
             {vehicleName && (
@@ -174,14 +174,24 @@ export function AnalysisResults({ result, onReset }: AnalysisResultsProps) {
               <Flag className="w-5 h-5 text-disaster" />
             </div>
             <h2 className="text-2xl md:text-3xl font-semibold text-gray-900">
-              Red Flags ({result.redFlags.length})
+              Red Flags ({result.tier === 'free' ? Math.min(2, result.redFlags.length) : result.redFlags.length})
             </h2>
           </div>
           <div className="grid md:grid-cols-2 gap-5">
-            {result.redFlags.map((flag, index) => (
+            {(result.tier === 'free' ? result.redFlags.slice(0, 2) : result.redFlags).map((flag, index) => (
               <RedFlagCard key={flag.id} flag={flag} index={index} tier={result.tier} />
             ))}
           </div>
+          {result.tier === 'free' && result.redFlags.length > 2 && (
+            <div className="mt-6 p-4 bg-caution/10 border border-caution/30 rounded-lg text-center">
+              <p className="text-sm text-charcoal/70">
+                {result.redFlags.length - 2} more red flag{result.redFlags.length - 2 === 1 ? '' : 's'} detected. 
+                <a href="#upgrade" className="text-caution font-semibold ml-1 hover:underline">
+                  Upgrade to Premium
+                </a> to see all red flags.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -190,8 +200,8 @@ export function AnalysisResults({ result, onReset }: AnalysisResultsProps) {
         <DataQualityCard dataQuality={result.dataQuality} />
       )}
 
-      {/* Vehicle Recalls */}
-      {result.recalls && result.recalls.length > 0 && (
+      {/* Vehicle Recalls - Paid Only */}
+      {!isFree && result.recalls && result.recalls.length > 0 && (
         <div className="bg-white p-6 md:p-8 rounded-xl border border-gray-200 shadow-sm">
           <button
             onClick={() => setIsRecallsExpanded(!isRecallsExpanded)}
@@ -311,13 +321,13 @@ export function AnalysisResults({ result, onReset }: AnalysisResultsProps) {
         </div>
       )}
 
-      {/* Environmental Risk Card */}
-      {result.environmentalRisk && (
+      {/* Environmental Risk Card - Paid Only */}
+      {!isFree && result.environmentalRisk && (
         <EnvironmentalRiskCard environmentalRisk={result.environmentalRisk} />
       )}
 
-      {/* Seller Signals Card */}
-      {result.sellerSignals && (
+      {/* Seller Signals Card - Paid Only */}
+      {!isFree && result.sellerSignals && (
         <SellerSignalsCard
           listingBehavior={result.sellerSignals.listingBehavior}
           pricingBehavior={result.sellerSignals.pricingBehavior}
@@ -425,12 +435,14 @@ export function AnalysisResults({ result, onReset }: AnalysisResultsProps) {
       {/* Upgrade Prompt - Show only for free tier */}
       {isFree && <UpgradePrompt />}
 
-      {/* Transparency Disclosure */}
-      <TransparencyDisclosure 
-        knownData={result.knownData} 
-        unknownData={result.unknownData}
-        tier={result.tier}
-      />
+      {/* Transparency Disclosure - Paid Only */}
+      {!isFree && (
+        <TransparencyDisclosure 
+          knownData={result.knownData} 
+          unknownData={result.unknownData}
+          tier={result.tier}
+        />
+      )}
     </div>
   );
 }

@@ -66,7 +66,7 @@ export function QuestionsSection({ questions, tier = 'free' }: QuestionsSectionP
 
       {/* Questions List */}
       <ol className="space-y-4">
-        {questions.map((question, index) => (
+        {(isFree ? questions.slice(0, 2) : questions).map((question, index) => (
           <li key={index} className="flex gap-4">
             <span className="font-mono text-lg font-semibold text-gray-400 flex-shrink-0 min-w-[2rem]">
               {(index + 1).toString().padStart(2, '0')}
@@ -77,6 +77,16 @@ export function QuestionsSection({ questions, tier = 'free' }: QuestionsSectionP
           </li>
         ))}
       </ol>
+      {isFree && questions.length > 2 && (
+        <div className="mt-6 p-4 bg-caution/10 border border-caution/30 rounded-lg text-center">
+          <p className="text-sm text-charcoal/70">
+            {questions.length - 2} more question{questions.length - 2 === 1 ? '' : 's'} available. 
+            <a href="#upgrade" className="text-caution font-semibold ml-1 hover:underline">
+              Upgrade to Premium
+            </a> to see all questions.
+          </p>
+        </div>
+      )}
 
       {/* Tip */}
         <div className="mt-6 pt-4 border-t border-gray-200">

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
+import { usePostHog } from "posthog-js/react";
 import { AnalysisResults } from "@/components/redflagged/analysis-results";
 import { VerdictResult } from "@/types/vehicle";
 import Navbar from "@/components/navbar";
@@ -150,6 +151,7 @@ export default function ReportPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { isSignedIn, user } = useUser();
+  const posthog = usePostHog();
   const [result, setResult] = useState<VerdictResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -178,6 +180,14 @@ export default function ReportPage() {
             setResult(parsedResult);
             setIsLoading(false);
             console.log('[Report] Loaded from database:', dbReportId);
+            
+            // Track report viewed
+            posthog?.capture("report_viewed", {
+              report_id: dbReportId,
+              verdict: parsedResult.verdict,
+              tier: parsedResult.tier || "free",
+              source: "database",
+            });
           } else {
             throw new Error("Invalid report data");
           }
@@ -323,6 +333,13 @@ export default function ReportPage() {
             localStorage.setItem("currentReport", upgradedData);
             
             setResult(upgradedResult);
+            
+            // Track checkout completed
+            posthog?.capture("checkout_completed", {
+              session_id: sessionId,
+              report_id: reportId,
+              verdict: upgradedResult.verdict,
+            });
           } else {
             // Even if not upgrading, check if paid tier report is missing assessment
             if (parsedResult.tier === 'paid' && !parsedResult.maintenanceRiskAssessment && parsedResult.vehicleInfo?.year) {
@@ -468,6 +485,13 @@ export default function ReportPage() {
             }
             
             setResult(parsedResult);
+            
+            // Track report viewed (free report)
+            posthog?.capture("report_viewed", {
+              verdict: parsedResult.verdict,
+              tier: parsedResult.tier || "free",
+              source: "localStorage",
+            });
           }
           
           setIsLoading(false);
@@ -529,13 +553,15 @@ export default function ReportPage() {
         verdict: reportData.verdict,
       });
 
+      const currentReportId = reportId || `report_${Date.now()}`;
+      
       const response = await fetch("/api/reports", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          reportId: reportId || `report_${Date.now()}`,
+          reportId: currentReportId,
           stripeSessionId: sessionId,
           vehicleInfo: reportData.vehicleInfo,
           reportData: reportData,
@@ -551,12 +577,33 @@ export default function ReportPage() {
         console.error("[Report] Error saving report:", responseData);
         const errorMessage = responseData.details || responseData.error || "Unknown error";
         console.error("[Report] Full error response:", JSON.stringify(responseData, null, 2));
+        
+        // Track report save failure
+        posthog?.capture("report_save_failed", {
+          report_id: currentReportId,
+          error: errorMessage,
+        });
+        
         alert(`Failed to save report: ${errorMessage}`);
       } else {
         console.log("[Report] Report saved successfully:", responseData);
+        
+        // Track report saved successfully
+        posthog?.capture("report_saved", {
+          report_id: currentReportId,
+          session_id: sessionId,
+          verdict: reportData.verdict,
+        });
       }
     } catch (err: any) {
       console.error("[Report] Error saving report to database:", err);
+      
+      // Track report save error
+      posthog?.capture("report_save_error", {
+        report_id: currentReportId,
+        error: err.message || "Network error",
+      });
+      
       alert(`Failed to save report: ${err.message || "Network error"}`);
     } finally {
       setIsSaving(false);

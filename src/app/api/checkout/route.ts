@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { reportId, amount = 2000, email } = body; // amount in cents ($20 = 2000 cents)
+    const { reportId, amount = 799, email } = body; // amount in cents ($7.99 = 799 cents)
 
     // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
@@ -33,9 +33,9 @@ export async function POST(request: NextRequest) {
             currency: "usd",
             product_data: {
               name: "Premium Vehicle Report",
-              description: "Complete vehicle history and detailed analysis",
+              description: "Premium vehicle analysis with detailed insights and risk indicators",
             },
-            unit_amount: amount, // $20 in cents
+            unit_amount: amount, // $7.99 in cents
           },
           quantity: 1,
         },

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import { usePostHog } from "posthog-js/react";
 import { 
   Zap, 
   Check, 
@@ -28,28 +29,30 @@ interface UpgradePromptProps {
 }
 
 const freeFeatures = [
-  { name: "Basic verdict (Deal/Caution/Disaster)", included: true },
+  { name: "Deal / Caution / Disaster verdict", included: true },
   { name: "Price vs. market comparison", included: true },
-  { name: "Top 3 red flags", included: true },
-  { name: "5 questions to ask seller", included: true },
-  { name: "Full vehicle history deep-dive", included: false },
+  { name: "Top 2 red flags identified", included: true },
+  { name: "2 questions to ask the seller", included: true },
+  { name: "Data quality transparency", included: true },
   { name: "Accident & title risk signals", included: false },
   { name: "Flood & lemon indicators", included: false },
-  { name: "Ownership pattern analysis", included: false },
-  { name: "30-day shareable report link", included: false },
+  { name: "Seller signal analysis", included: false },
+  { name: "Contextual tailored questions", included: false },
+  { name: "Shareable report link", included: false },
 ];
 
 const premiumFeatures = [
-  { icon: FileText, name: "Complete vehicle history analysis" },
   { icon: AlertTriangle, name: "Accident, title, flood & lemon indicators" },
   { icon: TrendingUp, name: "Detailed market pricing comparables" },
   { icon: Wrench, name: "Maintenance risk assessment" },
-  { icon: Share2, name: "Shareable report link (30 days)" },
+  { icon: FileText, name: "Contextual tailored questions" },
+  { icon: Share2, name: "Shareable report link" },
 ];
 
 export function UpgradePrompt({ reportId }: UpgradePromptProps) {
   const { isSignedIn, user } = useUser();
   const router = useRouter();
+  const posthog = usePostHog();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
@@ -71,12 +74,19 @@ export function UpgradePrompt({ reportId }: UpgradePromptProps) {
   const handleUpgrade = async () => {
     // Check if user is signed in
     if (!isSignedIn || !user) {
+      posthog?.capture("upgrade_prompted_sign_in");
       setShowSignInPrompt(true);
       setIsModalOpen(false);
       return;
     }
 
     setIsLoading(true);
+    
+    // Track upgrade initiated
+    posthog?.capture("upgrade_initiated", {
+      report_id: getReportId(),
+    });
+    
     try {
       const currentReportId = getReportId();
       const userEmail = user.emailAddresses[0]?.emailAddress || '';
@@ -88,17 +98,25 @@ export function UpgradePrompt({ reportId }: UpgradePromptProps) {
         },
         body: JSON.stringify({
           reportId: currentReportId,
-          amount: 2000,
+          amount: 799,
           email: userEmail,
         }),
       });
 
       if (!response.ok) {
         const error = await response.json();
+        posthog?.capture("checkout_failed", {
+          error: error.error || "Unknown error",
+        });
         throw new Error(error.error || "Failed to create checkout session");
       }
 
       const data = await response.json();
+
+      // Track checkout session created
+      posthog?.capture("checkout_session_created", {
+        report_id: currentReportId,
+      });
 
       if (data.url) {
         window.location.href = data.url;
@@ -166,7 +184,7 @@ export function UpgradePrompt({ reportId }: UpgradePromptProps) {
             >
               <span className="flex items-center gap-2">
                 <Shield className="w-5 h-5" />
-                Get Premium Report — $20
+                Get Premium Report — $7.99
               </span>
             </Button>
             <p className="text-xs text-white/60">
@@ -225,7 +243,7 @@ export function UpgradePrompt({ reportId }: UpgradePromptProps) {
             {/* Price & CTA */}
             <div className="mt-8 text-center">
               <div className="mb-4">
-                <span className="font-mono text-4xl font-semibold text-gray-900">$20</span>
+                <span className="font-mono text-4xl font-semibold text-gray-900">$7.99</span>
                 <span className="text-gray-600 ml-2">one-time</span>
               </div>
               

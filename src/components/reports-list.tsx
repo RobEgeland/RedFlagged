@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePostHog } from "posthog-js/react";
 import Link from "next/link";
 import { 
   FileText, 
@@ -10,7 +11,9 @@ import {
   CheckCircle2, 
   XCircle,
   Trash2,
-  ExternalLink
+  ExternalLink,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VerdictType } from "@/types/vehicle";
@@ -61,10 +64,12 @@ const verdictConfig = {
 };
 
 export function ReportsList({ userId }: ReportsListProps) {
+  const posthog = usePostHog();
   const [reports, setReports] = useState<Report[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     fetchReports();
@@ -104,6 +109,11 @@ export function ReportsList({ userId }: ReportsListProps) {
         throw new Error("Failed to delete report");
       }
 
+      // Track report deleted
+      posthog?.capture("report_deleted", {
+        report_id: reportId,
+      });
+
       // Remove from local state
       setReports(reports.filter((r) => r.id !== reportId));
     } catch (err: any) {
@@ -114,6 +124,11 @@ export function ReportsList({ userId }: ReportsListProps) {
     }
   };
 
+  const formatPrice = (price: number | null | undefined) => {
+    if (!price) return "—";
+    return `$${price.toLocaleString()}`;
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     // Use consistent format to avoid hydration issues
@@ -122,11 +137,6 @@ export function ReportsList({ userId }: ReportsListProps) {
     const day = date.getDate();
     const year = date.getFullYear();
     return `${month} ${day}, ${year}`;
-  };
-
-  const formatPrice = (price: number | null | undefined) => {
-    if (!price) return "—";
-    return `$${price.toLocaleString()}`;
   };
 
   if (isLoading) {
@@ -182,103 +192,136 @@ export function ReportsList({ userId }: ReportsListProps) {
     );
   }
 
+  // Sort reports by date (most recent first)
+  const sortedReports = [...reports].sort((a, b) => 
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+
   return (
     <div className="space-y-4">
-      {reports.map((report) => {
-        const config = verdictConfig[report.verdict];
-        const VerdictIcon = config.icon;
-        const vehicleName = report.vehicle_info.make && report.vehicle_info.model
-          ? `${report.vehicle_info.year || ''} ${report.vehicle_info.make} ${report.vehicle_info.model}`.trim()
-          : report.vehicle_info.vin || "Unknown Vehicle";
-
-        // Use database ID instead of encoding full data (prevents 431 errors for large reports)
-        const viewUrl = `/report?id=${report.id}`;
-
-        return (
-          <div
-            key={report.id}
-            className={`bg-card border-2 ${config.borderColor} rounded-lg p-6 hover:shadow-lg transition-all`}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className={`p-2 ${config.bgColor} rounded-lg`}>
-                    <VerdictIcon className={`w-5 h-5 ${config.color}`} />
-                  </div>
-                  <div>
-                    <h3 className="font-display text-lg font-semibold text-charcoal truncate">
-                      {vehicleName}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`text-xs font-semibold px-2 py-1 rounded ${config.bgColor} ${config.color}`}>
-                        {config.label}
-                      </span>
-                      <span className="text-xs text-charcoal/60 flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        {formatDate(report.created_at)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-                  <div>
-                    <p className="text-xs text-charcoal/60 mb-1">Asking Price</p>
-                    <p className="font-semibold text-charcoal flex items-center gap-1">
-                      <DollarSign className="w-4 h-4" />
-                      {formatPrice(report.asking_price)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-charcoal/60 mb-1">Est. Market Value</p>
-                    <p className="font-semibold text-charcoal flex items-center gap-1">
-                      <DollarSign className="w-4 h-4" />
-                      {formatPrice(report.estimated_value)}
-                    </p>
-                  </div>
-                  {report.vehicle_info.vin && (
-                    <div>
-                      <p className="text-xs text-charcoal/60 mb-1">VIN</p>
-                      <p className="font-mono text-sm text-charcoal truncate">
-                        {report.vehicle_info.vin}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Link href={viewUrl}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-2"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    View Report
-                  </Button>
-                </Link>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDelete(report.id)}
-                  disabled={deletingId === report.id}
-                  className="text-disaster hover:text-disaster hover:bg-disaster/10 border-disaster/30"
-                >
-                  {deletingId === report.id ? (
-                    <span className="w-4 h-4 border-2 border-disaster/30 border-t-disaster rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <Trash2 className="w-4 h-4" />
-                      Delete
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
+      {/* Collapsible Header */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between p-4 bg-card border border-charcoal/10 rounded-lg hover:bg-charcoal/5 transition-colors text-left"
+      >
+        <div className="flex items-center gap-3">
+          <FileText className="w-5 h-5 text-charcoal" />
+          <div>
+            <h3 className="font-display font-semibold text-charcoal">
+              {reports.length} {reports.length === 1 ? 'Report' : 'Reports'} Saved
+            </h3>
+            <p className="text-sm text-charcoal/60">
+              {isExpanded ? 'Click to collapse' : 'Click to view all reports'}
+            </p>
           </div>
-        );
-      })}
+        </div>
+        {isExpanded ? (
+          <ChevronUp className="w-5 h-5 text-charcoal/60" />
+        ) : (
+          <ChevronDown className="w-5 h-5 text-charcoal/60" />
+        )}
+      </button>
+
+      {/* Reports List - Collapsible */}
+      {isExpanded && (
+        <div className="space-y-4 animate-fade-in">
+          {sortedReports.map((report) => {
+            const config = verdictConfig[report.verdict];
+            const VerdictIcon = config.icon;
+            const vehicleName = report.vehicle_info.make && report.vehicle_info.model
+              ? `${report.vehicle_info.year || ''} ${report.vehicle_info.make} ${report.vehicle_info.model}`.trim()
+              : report.vehicle_info.vin || "Unknown Vehicle";
+
+            // Use database ID instead of encoding full data (prevents 431 errors for large reports)
+            const viewUrl = `/report?id=${report.id}`;
+
+            return (
+              <div
+                key={report.id}
+                className={`bg-card border-2 ${config.borderColor} rounded-lg p-6 hover:shadow-lg transition-all`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className={`p-2 ${config.bgColor} rounded-lg`}>
+                        <VerdictIcon className={`w-5 h-5 ${config.color}`} />
+                      </div>
+                      <div>
+                        <h3 className="font-display text-lg font-semibold text-charcoal truncate">
+                          {vehicleName}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`text-xs font-semibold px-2 py-1 rounded ${config.bgColor} ${config.color}`}>
+                            {config.label}
+                          </span>
+                          <span className="text-xs text-charcoal/60 flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {formatDate(report.created_at)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                      <div>
+                        <p className="text-xs text-charcoal/60 mb-1">Asking Price</p>
+                        <p className="font-semibold text-charcoal flex items-center gap-1">
+                          <DollarSign className="w-4 h-4" />
+                          {formatPrice(report.asking_price)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-charcoal/60 mb-1">Est. Market Value</p>
+                        <p className="font-semibold text-charcoal flex items-center gap-1">
+                          <DollarSign className="w-4 h-4" />
+                          {formatPrice(report.estimated_value)}
+                        </p>
+                      </div>
+                      {report.vehicle_info.vin && (
+                        <div>
+                          <p className="text-xs text-charcoal/60 mb-1">VIN</p>
+                          <p className="font-mono text-sm text-charcoal truncate">
+                            {report.vehicle_info.vin}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Link href={viewUrl}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        View Report
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(report.id)}
+                      disabled={deletingId === report.id}
+                      className="text-disaster hover:text-disaster hover:bg-disaster/10 border-disaster/30"
+                    >
+                      {deletingId === report.id ? (
+                        <span className="w-4 h-4 border-2 border-disaster/30 border-t-disaster rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <Trash2 className="w-4 h-4" />
+                          Delete
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

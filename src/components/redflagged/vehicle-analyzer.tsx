@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { usePostHog } from "posthog-js/react";
 import { VinInputForm } from "./vin-input-form";
 import { AnalysisLoading } from "./analysis-loading";
 import { analyzeVehicle } from "@/lib/vehicle-analysis";
@@ -11,13 +12,30 @@ export function VehicleAnalyzer() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const posthog = usePostHog();
 
   const handleSubmit = async (data: AnalysisRequest) => {
     setIsLoading(true);
     setError(null);
     
+    // Track analysis started
+    posthog?.capture("analysis_started", {
+      has_vin: !!data.vin,
+      has_manual_input: !!(data.year && data.make && data.model),
+      asking_price: data.askingPrice,
+    });
+    
     try {
       const analysisResult = await analyzeVehicle(data);
+      
+      // Track successful analysis
+      posthog?.capture("analysis_completed", {
+        verdict: analysisResult.verdict,
+        has_red_flags: (analysisResult.redFlags?.length || 0) > 0,
+        red_flags_count: analysisResult.redFlags?.length || 0,
+        estimated_value: analysisResult.estimatedValue,
+        asking_price: data.askingPrice,
+      });
       
       // Encode result as base64 for localStorage
       // Store in localStorage (URL was causing 431 errors due to size)
@@ -27,6 +45,11 @@ export function VehicleAnalyzer() {
       // Redirect to report page without data in URL (report page reads from localStorage)
       router.push("/report");
     } catch (err: any) {
+      // Track analysis error
+      posthog?.capture("analysis_failed", {
+        error_message: err?.message || "Unknown error",
+      });
+      
       console.error('Analysis error:', err);
       console.error('Error details:', {
         message: err?.message,

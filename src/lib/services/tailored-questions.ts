@@ -74,18 +74,12 @@ export function generateTailoredQuestions(result: VerdictResult): TailoredQuesti
     });
   }
   
-  // Pricing Questions
-  if (result.vehicleInfo.priceDifferencePercent && result.vehicleInfo.priceDifferencePercent > 10) {
-    const diff = Math.abs(result.vehicleInfo.priceDifferencePercent);
-    questions.push({
-      question: `I've researched similar vehicles and found comparable listings priced ${diff.toFixed(0)}% ${result.vehicleInfo.priceDifferencePercent > 0 ? 'lower' : 'higher'} than your asking price. What factors justify this price difference?`,
-      category: 'pricing',
-      priority: 'high',
-      context: `Market analysis shows the asking price is ${diff.toFixed(0)}% ${result.vehicleInfo.priceDifferencePercent > 0 ? 'above' : 'below'} typical market value for similar vehicles.`,
-      relatedFindings: [`Price ${diff.toFixed(0)}% ${result.vehicleInfo.priceDifferencePercent > 0 ? 'above' : 'below'} market value`]
-    });
-  }
+  // Pricing Questions - Consolidated to avoid duplicates
+  // Priority: Use marketPricingAnalysis if available (more detailed), otherwise use vehicleInfo.priceDifferencePercent
   
+  let pricingQuestionAdded = false;
+  
+  // First, check for underpriced flag (critical priority)
   if (flagIds.has('underpriced')) {
     questions.push({
       question: 'This price seems significantly lower than market value. Is there anything wrong with the vehicle I should know about? Any mechanical issues, damage, or other concerns?',
@@ -94,16 +88,52 @@ export function generateTailoredQuestions(result: VerdictResult): TailoredQuesti
       context: 'Unusually low pricing may indicate hidden problems or urgent seller motivation.',
       relatedFindings: ['Unusually low price detected']
     });
+    pricingQuestionAdded = true;
   }
   
-  if (result.marketPricingAnalysis?.negotiationLeverage.level === 'strong') {
+  // Use marketPricingAnalysis if available (premium feature, more accurate)
+  if (result.marketPricingAnalysis && !pricingQuestionAdded) {
+    const mpa = result.marketPricingAnalysis;
+    const diffPercent = Math.abs(mpa.askingPricePosition.differencePercent);
+    const isAbove = mpa.askingPricePosition.position === 'above';
+    
+    // Only generate pricing question if there's a significant difference (>5%)
+    if (diffPercent > 5) {
+      if (mpa.negotiationLeverage.level === 'strong' || mpa.negotiationLeverage.level === 'moderate') {
+        // If there's negotiation leverage, focus on negotiation
+        questions.push({
+          question: `Based on market data, similar vehicles are priced ${diffPercent.toFixed(0)}% ${isAbove ? 'lower' : 'higher'}. Are you open to negotiation?`,
+          category: 'pricing',
+          priority: 'high',
+          context: mpa.negotiationLeverage.explanation,
+          relatedFindings: [`Price ${diffPercent.toFixed(0)}% ${isAbove ? 'above' : 'below'} market value`, 'Market pricing analysis indicates negotiation leverage']
+        });
+      } else {
+        // If no strong leverage, ask about justification
+        questions.push({
+          question: `I've researched similar vehicles and found comparable listings priced ${diffPercent.toFixed(0)}% ${isAbove ? 'lower' : 'higher'} than your asking price. What factors justify this price difference?`,
+          category: 'pricing',
+          priority: 'high',
+          context: `Market analysis shows the asking price is ${diffPercent.toFixed(0)}% ${isAbove ? 'above' : 'below'} typical market value for similar vehicles.`,
+          relatedFindings: [`Price ${diffPercent.toFixed(0)}% ${isAbove ? 'above' : 'below'} market value`]
+        });
+      }
+      pricingQuestionAdded = true;
+    }
+  }
+  
+  // Fallback to vehicleInfo.priceDifferencePercent if marketPricingAnalysis not available
+  if (!pricingQuestionAdded && result.vehicleInfo.priceDifferencePercent && Math.abs(result.vehicleInfo.priceDifferencePercent) > 10) {
+    const diff = Math.abs(result.vehicleInfo.priceDifferencePercent);
+    const isAbove = result.vehicleInfo.priceDifferencePercent > 0;
     questions.push({
-      question: `Based on market data, similar vehicles are priced ${Math.abs(result.marketPricingAnalysis.askingPricePosition.differencePercent).toFixed(0)}% ${result.marketPricingAnalysis.askingPricePosition.position === 'above' ? 'lower' : 'higher'}. Are you open to negotiation?`,
+      question: `I've researched similar vehicles and found comparable listings priced ${diff.toFixed(0)}% ${isAbove ? 'lower' : 'higher'} than your asking price. What factors justify this price difference?`,
       category: 'pricing',
       priority: 'high',
-      context: result.marketPricingAnalysis.negotiationLeverage.explanation,
-      relatedFindings: ['Market pricing analysis indicates strong negotiation leverage']
+      context: `Market analysis shows the asking price is ${diff.toFixed(0)}% ${isAbove ? 'above' : 'below'} typical market value for similar vehicles.`,
+      relatedFindings: [`Price ${diff.toFixed(0)}% ${isAbove ? 'above' : 'below'} market value`]
     });
+    pricingQuestionAdded = true;
   }
   
   // Maintenance Questions

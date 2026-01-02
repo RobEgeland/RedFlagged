@@ -109,10 +109,10 @@ export function TransparencyDisclosure({ knownData, unknownData, tier = 'free' }
           {/* Data Sources */}
           <div className="text-xs text-gray-500 space-y-1">
             <p className="font-semibold text-gray-600">Data Sources:</p>
-            {!isFree && <p>Vehicle history: Carfax/AutoCheck/NMVTIS databases</p>}
+            {!isFree && <p>Vehicle history: Vehicle history databases</p>}
             <p>Market pricing: Aggregated from public listings and auction data</p>
-            <p>VIN decode: NHTSA VIN decoder database</p>
-            {!isFree && <p>Disaster data: FEMA disaster zone records</p>}
+            <p>VIN decode: VIN decoder database</p>
+            {!isFree && <p>Disaster data: Disaster zone records</p>}
             <p>Analysis generated: {generatedDate || "—"}</p>
             {isFree && <p className="text-caution font-medium">⚠️ Limited data sources in free tier - upgrade for complete analysis</p>}
           </div>

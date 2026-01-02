@@ -1,5 +1,7 @@
 import { TempoInit } from "@/components/tempo-init";
 import { ClerkClientProvider } from "@/components/clerk-provider";
+import { PostHogProviderWrapper } from "@/components/posthog-provider";
+import { PostHogAuth } from "@/components/posthog-auth";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
@@ -19,12 +21,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      
-      <body className={inter.className}>
-        <ClerkClientProvider>
-          {children}
-          <TempoInit />
-        </ClerkClientProvider>
+      <body className={inter.className} suppressHydrationWarning>
+        <PostHogProviderWrapper>
+          <ClerkClientProvider>
+            <PostHogAuth />
+            {children}
+            <TempoInit />
+          </ClerkClientProvider>
+        </PostHogProviderWrapper>
       </body>
     </html>
   );

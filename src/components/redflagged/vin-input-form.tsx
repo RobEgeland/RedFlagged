@@ -6,8 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { 
   Search, 
-  ChevronDown, 
-  ChevronUp, 
   Car,
   DollarSign,
   Gauge
@@ -19,27 +17,10 @@ interface VinInputFormProps {
   isLoading: boolean;
 }
 
-const carMakes = [
-  "Acura", "Audi", "BMW", "Buick", "Cadillac", "Chevrolet", "Chrysler", 
-  "Dodge", "Ford", "GMC", "Honda", "Hyundai", "Infiniti", "Jaguar", 
-  "Jeep", "Kia", "Lexus", "Lincoln", "Mazda", "Mercedes-Benz", "Nissan", 
-  "Porsche", "Ram", "Subaru", "Tesla", "Toyota", "Volkswagen", "Volvo"
-];
-
-const currentYear = new Date().getFullYear();
-const years = Array.from({ length: 30 }, (_, i) => currentYear - i);
-
 export function VinInputForm({ onSubmit, isLoading }: VinInputFormProps) {
-  const [inputMode, setInputMode] = useState<'vin' | 'manual'>('vin');
   const [vin, setVin] = useState("");
   const [vinError, setVinError] = useState("");
   const [askingPrice, setAskingPrice] = useState("");
-  const [showManual, setShowManual] = useState(false);
-  
-  // Manual entry fields
-  const [year, setYear] = useState("");
-  const [make, setMake] = useState("");
-  const [model, setModel] = useState("");
   const [mileage, setMileage] = useState("");
   const [location, setLocation] = useState(""); // For disaster geography checking
 
@@ -73,6 +54,12 @@ export function VinInputForm({ onSubmit, isLoading }: VinInputFormProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // VIN is required
+    if (!vin || !validateVin(vin)) {
+      setVinError("Please enter a valid 17-character VIN");
+      return;
+    }
+    
     // Parse price, removing commas
     const priceValueStr = askingPrice.replace(/,/g, '');
     const priceValue = parseFloat(priceValueStr);
@@ -85,36 +72,13 @@ export function VinInputForm({ onSubmit, isLoading }: VinInputFormProps) {
     const mileageValue = mileage 
       ? parseInt(mileage.replace(/,/g, ''), 10) 
       : undefined;
-
-    if (inputMode === 'vin') {
-      if (vin && !validateVin(vin)) {
-        setVinError("Please enter a valid 17-character VIN");
-        return;
-      }
-      
-      onSubmit({
-        vin: vin || undefined,
-        askingPrice: priceValue,
-        year: year ? parseInt(year, 10) : undefined,
-        make: make || undefined,
-        model: model || undefined,
-        mileage: mileageValue,
-        location: location.trim() || undefined,
-      });
-    } else {
-      if (!year || !make || !model.trim()) {
-        return;
-      }
-      
-      onSubmit({
-        year: parseInt(year, 10),
-        make: make.trim(),
-        model: model.trim(),
-        mileage: mileageValue,
-        askingPrice: priceValue,
-        location: location.trim() || undefined,
-      });
-    }
+    
+    onSubmit({
+      vin: vin.trim().toUpperCase(),
+      askingPrice: priceValue,
+      mileage: mileageValue,
+      location: location.trim() || undefined,
+    });
   };
 
   const formatPrice = (value: string) => {
@@ -173,27 +137,16 @@ export function VinInputForm({ onSubmit, isLoading }: VinInputFormProps) {
 
   // Check if form is valid
   const isFormValid = () => {
-    // Asking price is always required
+    // VIN is required and must be valid
+    if (!vin || !validateVin(vin)) {
+      console.log('[Form Validation] VIN invalid');
+      return false;
+    }
+
+    // Asking price is required
     if (!isPriceValid()) {
       console.log('[Form Validation] Price invalid');
       return false;
-    }
-
-    // In manual mode, year, make, and model are required
-    if (inputMode === 'manual') {
-      if (!year || !make || !model.trim()) {
-        console.log('[Form Validation] Manual fields incomplete:', { year, make, model });
-        return false;
-      }
-    }
-
-    // In VIN mode, if VIN is provided, it must be valid
-    if (inputMode === 'vin' && vin && vin.length > 0) {
-      const vinValid = validateVin(vin);
-      console.log('[Form Validation] VIN check:', { vin, length: vin.length, isValid: vinValid });
-      if (!vinValid) {
-      return false;
-      }
     }
 
     console.log('[Form Validation] Form is valid');
@@ -204,179 +157,31 @@ export function VinInputForm({ onSubmit, isLoading }: VinInputFormProps) {
     <div className="w-full max-w-2xl mx-auto">
       <div className="bg-white border border-gray-200 rounded-xl p-6 md:p-8 shadow-sm">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Mode Toggle */}
-          <div className="flex gap-2 p-1.5 bg-gray-100 rounded-lg">
-            <button
-              type="button"
-              onClick={() => setInputMode('vin')}
-              className={`flex-1 py-2.5 px-4 rounded-md text-sm font-medium transition-all ${
-                inputMode === 'vin' 
-                  ? 'bg-gray-900 text-white shadow-sm' 
-                  : 'text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Enter VIN
-            </button>
-            <button
-              type="button"
-              onClick={() => setInputMode('manual')}
-              className={`flex-1 py-2.5 px-4 rounded-md text-sm font-medium transition-all ${
-                inputMode === 'manual' 
-                  ? 'bg-gray-900 text-white shadow-sm' 
-                  : 'text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Manual Entry
-            </button>
+          {/* VIN Input */}
+          <div className="space-y-2">
+            <Label htmlFor="vin" className="text-sm font-medium text-charcoal">
+              Vehicle Identification Number (VIN) *
+            </Label>
+            <div className="relative">
+              <Input
+                id="vin"
+                type="text"
+                value={vin}
+                onChange={handleVinChange}
+                placeholder="1HGCM82633A004352"
+                className="font-mono text-base tracking-wider pl-10 h-12 border-gray-300 focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
+                maxLength={17}
+                required
+              />
+              <Car className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+            </div>
+            {vinError && (
+              <p className="text-disaster text-sm font-medium">{vinError}</p>
+            )}
+            <p className="text-xs text-gray-600">
+              Found on driver&apos;s side dashboard or door jamb.
+            </p>
           </div>
-
-          {/* VIN Input Mode */}
-          {inputMode === 'vin' && (
-            <div className="space-y-2">
-              <Label htmlFor="vin" className="text-sm font-medium text-charcoal">
-                Vehicle Identification Number (VIN)
-              </Label>
-              <div className="relative">
-                <Input
-                  id="vin"
-                  type="text"
-                  value={vin}
-                  onChange={handleVinChange}
-                  placeholder="1HGCM82633A004352"
-                  className="font-mono text-base tracking-wider pl-10 h-12 border-gray-300 focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
-                  maxLength={17}
-                />
-                <Car className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-              </div>
-              {vinError && (
-                <p className="text-disaster text-sm font-medium">{vinError}</p>
-              )}
-              <p className="text-xs text-gray-600">
-                Found on driver&apos;s side dashboard or door jamb. Leave blank to skip VIN lookup.
-              </p>
-            </div>
-          )}
-
-          {/* Manual Entry Mode */}
-          {inputMode === 'manual' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="year" className="text-sm font-medium text-gray-900">
-                  Year *
-                </Label>
-                <select
-                  id="year"
-                  value={year}
-                  onChange={(e) => setYear(e.target.value)}
-                  className="w-full h-12 px-3 border border-gray-300 rounded-md bg-white focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
-                  required={inputMode === 'manual'}
-                >
-                  <option value="">Select Year</option>
-                  {years.map((y) => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="make" className="text-sm font-medium text-gray-900">
-                  Make *
-                </Label>
-                <select
-                  id="make"
-                  value={make}
-                  onChange={(e) => setMake(e.target.value)}
-                  className="w-full h-12 px-3 border border-gray-300 rounded-md bg-white focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
-                  required={inputMode === 'manual'}
-                >
-                  <option value="">Select Make</option>
-                  {carMakes.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="model" className="text-sm font-medium text-gray-900">
-                  Model *
-                </Label>
-                <Input
-                  id="model"
-                  type="text"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="e.g., Camry, Civic, F-150"
-                  className="h-12 border-gray-300 focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
-                  required={inputMode === 'manual'}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Optional Fields Toggle for VIN mode */}
-          {inputMode === 'vin' && (
-            <button
-              type="button"
-              onClick={() => setShowManual(!showManual)}
-              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              {showManual ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              {showManual ? 'Hide' : 'Add'} vehicle details for better accuracy
-            </button>
-          )}
-
-          {/* Optional Manual Fields for VIN mode */}
-          {inputMode === 'vin' && showManual && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-              <div className="space-y-2">
-                <Label htmlFor="year-optional" className="text-sm font-medium text-gray-600">
-                  Year
-                </Label>
-                <select
-                  id="year-optional"
-                  value={year}
-                  onChange={(e) => setYear(e.target.value)}
-                  className="w-full h-10 px-3 border border-gray-200 rounded-md bg-white text-sm"
-                >
-                  <option value="">Select</option>
-                  {years.map((y) => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="make-optional" className="text-sm font-medium text-gray-600">
-                  Make
-                </Label>
-                <select
-                  id="make-optional"
-                  value={make}
-                  onChange={(e) => setMake(e.target.value)}
-                  className="w-full h-10 px-3 border border-gray-200 rounded-md bg-white text-sm"
-                >
-                  <option value="">Select</option>
-                  {carMakes.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="model-optional" className="text-sm font-medium text-gray-600">
-                  Model
-                </Label>
-                <Input
-                  id="model-optional"
-                  type="text"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="Model"
-                  className="h-10 border-gray-200 text-sm"
-                />
-              </div>
-            </div>
-          )}
 
           {/* Mileage */}
           <div className="space-y-2">
@@ -465,12 +270,10 @@ export function VinInputForm({ onSubmit, isLoading }: VinInputFormProps) {
           {/* Validation Hint */}
           {!isFormValid() && !isLoading && (
             <p className="text-sm text-gray-500 text-center mt-2">
-              {!isPriceValid() ? (
-                <span>Please enter a valid asking price</span>
-              ) : inputMode === 'vin' && vin && vin.length > 0 && !validateVin(vin) ? (
+              {!vin || !validateVin(vin) ? (
                 <span>Please enter a valid 17-character VIN</span>
-              ) : inputMode === 'manual' && (!year || !make || !model.trim()) ? (
-                <span>Please fill in all required fields (Year, Make, Model)</span>
+              ) : !isPriceValid() ? (
+                <span>Please enter a valid asking price</span>
               ) : (
                 <span>Please complete all required fields</span>
               )}
@@ -481,3 +284,4 @@ export function VinInputForm({ onSubmit, isLoading }: VinInputFormProps) {
     </div>
   );
 }
+

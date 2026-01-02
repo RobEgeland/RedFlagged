@@ -119,16 +119,16 @@ export function RedFlagCard({ flag, index, tier = 'free' }: RedFlagCardProps) {
             {flag.description}
           </p>
 
-          {/* Expanded Content - paid tier gets expanded details and methodology */}
-          {isExpanded && (flag.expandedDetails || flag.methodology) && (
+          {/* Expanded Content - always show expanded details if available, or use description as fallback */}
+          {isExpanded && (
             <div className="mt-5 pt-5 border-t border-gray-200 space-y-4 animate-fade-in-up">
-              {flag.expandedDetails && (
+              {(flag.expandedDetails || flag.description) && (
                 <div>
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
                     What This Means
                   </h4>
                   <p className="text-sm text-gray-700 leading-relaxed">
-                    {flag.expandedDetails}
+                    {flag.expandedDetails || flag.description}
                   </p>
                 </div>
               )}

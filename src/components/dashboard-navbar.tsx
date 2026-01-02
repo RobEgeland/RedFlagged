@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useClerk } from '@clerk/nextjs'
+import { useClerk, useUser } from '@clerk/nextjs'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,12 +9,24 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu'
 import { Button } from './ui/button'
-import { UserCircle, Flag, Home } from 'lucide-react'
+import { Flag, Home } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 export default function DashboardNavbar() {
   const { signOut } = useClerk()
+  const { user } = useUser()
   const router = useRouter()
+
+  // Get first letter of first name, or fallback to email first letter
+  const getInitial = () => {
+    if (user?.firstName) {
+      return user.firstName.charAt(0).toUpperCase()
+    }
+    if (user?.emailAddresses?.[0]?.emailAddress) {
+      return user.emailAddresses[0].emailAddress.charAt(0).toUpperCase()
+    }
+    return 'U'
+  }
 
   return (
     <nav className="w-full border-b border-charcoal/10 bg-cream/80 backdrop-blur-sm py-3 sticky top-0 z-50">
@@ -39,8 +51,10 @@ export default function DashboardNavbar() {
         <div className="flex gap-4 items-center">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="hover:bg-charcoal/10">
-                <UserCircle className="h-6 w-6 text-charcoal/70" />
+              <Button variant="ghost" size="icon" className="hover:bg-charcoal/10 rounded-full">
+                <div className="w-8 h-8 rounded-full bg-charcoal text-cream flex items-center justify-center font-semibold text-sm">
+                  {getInitial()}
+                </div>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-cream border-charcoal/20">

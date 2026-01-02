@@ -280,7 +280,9 @@ function generateRedFlagsFromAllData(
         : `This vehicle is listed significantly above market value. The asking price is $${Math.abs(priceDiff).toLocaleString()} more than comparable vehicles.`,
       severity: priceDiffPercent > 30 ? 'critical' : priceDiffPercent > 20 ? 'high' : 'medium',
       category: 'pricing',
-      expandedDetails: tier === 'paid' ? `Based on current market data from Auto.dev listings and MarketCheck, similar vehicles in comparable condition typically sell for 15-20% less than this asking price.` : undefined,
+      expandedDetails: tier === 'paid' 
+        ? `Based on current market data from Auto.dev listings and MarketCheck, similar vehicles in comparable condition typically sell for 15-20% less than this asking price.`
+        : `This vehicle appears to be listed above market value. Consider negotiating or comparing with similar vehicles in your area.`,
       methodology: tier === 'paid' ? 'Compared against average retail prices from multiple market data sources.' : undefined,
       dataSource: tier === 'paid' ? 'Market Listings Data (Auto.dev, MarketCheck)' : undefined
     });
@@ -293,7 +295,9 @@ function generateRedFlagsFromAllData(
         : `This price seems suspiciously low. While it could be a great deal, significant underpricing often indicates hidden problems.`,
       severity: priceDiffPercent < -35 ? 'high' : 'medium',
       category: 'pricing',
-      expandedDetails: tier === 'paid' ? `Vehicles priced this far below market often have undisclosed issues like salvage titles, flood damage, or major mechanical problems. Proceed with extra caution.` : undefined,
+      expandedDetails: tier === 'paid' 
+        ? `Vehicles priced this far below market often have undisclosed issues like salvage titles, flood damage, or major mechanical problems. Proceed with extra caution.`
+        : `This price seems suspiciously low. While it could be a great deal, significant underpricing often indicates hidden problems. Ask the seller about the vehicle's history and condition.`,
       methodology: tier === 'paid' ? 'Compared against average retail prices from multiple market data sources.' : undefined,
       dataSource: tier === 'paid' ? 'Market Listings Data' : undefined
     });
@@ -369,7 +373,25 @@ function generateRedFlagsFromAllData(
           : `This vehicle has the following title brands: ${nmvtis.titleBrands.join(', ')}. This significantly impacts value and insurability.`,
         severity: 'critical',
         category: 'title',
-        expandedDetails: tier === 'paid' ? `Title brands indicate the vehicle has been damaged, salvaged, or otherwise compromised. Insurance may be difficult to obtain, and resale value is permanently affected.` : undefined,
+        expandedDetails: tier === 'paid' 
+          ? `Title brands indicate the vehicle has been damaged, salvaged, or otherwise compromised. Insurance may be difficult to obtain, and resale value is permanently affected.`
+          : `Title brands significantly impact vehicle value and insurability. Request to see the title and verify what brands are present before proceeding.`,
+        dataSource: 'NMVTIS Database'
+      });
+    }
+    
+    if (nmvtis.salvageRecord) {
+      flags.push({
+        id: 'salvage-record',
+        title: 'Salvage Record Found',
+        description: tier === 'free'
+          ? `Vehicle has a salvage record on file.`
+          : `This vehicle has been declared a total loss or salvaged. This typically means significant damage that exceeded the vehicle's value, and the vehicle may have been rebuilt.`,
+        severity: 'critical',
+        category: 'title',
+        expandedDetails: tier === 'paid' 
+          ? `A salvage record indicates the vehicle was declared a total loss by an insurance company, usually due to severe damage from an accident, flood, fire, or other incident. Even if rebuilt, salvage vehicles have significantly reduced value, may be difficult to insure, and could have hidden structural or mechanical issues. Always have a salvage vehicle inspected by a qualified mechanic before purchase.`
+          : `A salvage record indicates the vehicle was declared a total loss. This significantly impacts value and insurability. Request documentation about the salvage status and any repairs made before proceeding.`,
         dataSource: 'NMVTIS Database'
       });
     }
@@ -381,7 +403,9 @@ function generateRedFlagsFromAllData(
         description: 'This vehicle has been reported stolen in the past.',
         severity: 'critical',
         category: 'history',
-        expandedDetails: tier === 'paid' ? `Even if recovered, vehicles with theft history may have hidden damage or tampering. Verify the vehicle was properly recovered and cleared by law enforcement.` : undefined,
+        expandedDetails: tier === 'paid' 
+          ? `Even if recovered, vehicles with theft history may have hidden damage or tampering. Verify the vehicle was properly recovered and cleared by law enforcement.`
+          : `Vehicles with theft history may have hidden damage or tampering. Verify the vehicle was properly recovered and cleared by law enforcement before purchasing.`,
         dataSource: 'NMVTIS Database'
       });
     }
@@ -473,7 +497,9 @@ function generateRedFlagsFromAllData(
           : disasterRisk.details[0] || 'This vehicle is registered in an area with natural disaster history.',
         severity: disasterRisk.riskLevel === 'high' ? 'high' : 'medium',
         category: 'disaster',
-        expandedDetails: tier === 'paid' ? disasterRisk.details.join(' ') : undefined,
+        expandedDetails: tier === 'paid' 
+          ? disasterRisk.details.join(' ')
+          : `This vehicle is registered in an area with natural disaster history. Inspect carefully for water damage, corrosion, or other environmental issues.`,
         dataSource: tier === 'paid' ? 'FEMA, NOAA, USGS' : 'FEMA'
       });
     }
@@ -576,7 +602,9 @@ function generateRedFlagsFromAllData(
         : 'Without a VIN, we cannot verify vehicle history, recalls, or title status. This significantly limits our analysis.',
       severity: 'high',
       category: 'data-gap',
-      expandedDetails: tier === 'paid' ? 'The Vehicle Identification Number (VIN) is essential for accessing NMVTIS data, recall information, and verifying the vehicle is not stolen. Always obtain the VIN before proceeding.' : undefined
+      expandedDetails: tier === 'paid' 
+        ? 'The Vehicle Identification Number (VIN) is essential for accessing NMVTIS data, recall information, and verifying the vehicle is not stolen. Always obtain the VIN before proceeding.'
+        : 'Without a VIN, we cannot verify vehicle history, recalls, or title status. Always obtain the VIN before proceeding with any purchase.'
     });
   }
   
@@ -588,7 +616,9 @@ function generateRedFlagsFromAllData(
       description: `At ${age} years old, this vehicle may require more maintenance.`,
       severity: 'low',
       category: 'ownership',
-      expandedDetails: tier === 'paid' ? 'Older vehicles often have worn seals, aging electrical systems, and may be more expensive to insure. Request maintenance records to verify proper care.' : undefined,
+      expandedDetails: tier === 'paid' 
+        ? 'Older vehicles often have worn seals, aging electrical systems, and may be more expensive to insure. Request maintenance records to verify proper care.'
+        : 'Older vehicles may require more maintenance and can be more expensive to insure. Request maintenance records to verify the vehicle has been properly cared for.',
     });
   }
   
@@ -605,7 +635,9 @@ function generateRedFlagsFromAllData(
           : `This vehicle has ${mileage.toLocaleString()} miles, which is ${Math.round((mileage / expectedMileage - 1) * 100)}% higher than average for its age.`,
         severity: mileage > expectedMileage * 2 ? 'high' : 'medium',
         category: 'ownership',
-        expandedDetails: tier === 'paid' ? 'High mileage vehicles may have more wear on critical components. Ensure timing belt/chain service has been performed if applicable, and check for oil leaks.' : undefined
+        expandedDetails: tier === 'paid' 
+          ? 'High mileage vehicles may have more wear on critical components. Ensure timing belt/chain service has been performed if applicable, and check for oil leaks.'
+          : 'High mileage vehicles may have more wear on critical components. Ask about major maintenance items like timing belt/chain replacement and check for signs of excessive wear.'
       });
     } else if (mileage < expectedMileage * 0.4 && age > 3) {
       flags.push({
@@ -616,20 +648,12 @@ function generateRedFlagsFromAllData(
           : `Only ${mileage.toLocaleString()} miles on a ${age}-year-old vehicle is suspicious. This could indicate odometer tampering or extended storage.`,
         severity: 'medium',
         category: 'history',
-        expandedDetails: tier === 'paid' ? 'While genuinely low-mileage vehicles exist, be cautious. Vehicles that sat unused can develop issues like dried seals, degraded fluids, and battery problems. Verify the odometer reading matches service records.' : undefined
+        expandedDetails: tier === 'paid' 
+          ? 'While genuinely low-mileage vehicles exist, be cautious. Vehicles that sat unused can develop issues like dried seals, degraded fluids, and battery problems. Verify the odometer reading matches service records.'
+          : 'While genuinely low-mileage vehicles exist, be cautious. Vehicles that sat unused can develop issues. Verify the odometer reading matches service records and ask about storage conditions.'
       });
     }
   }
-  
-  // Private sale standard flag
-  flags.push({
-    id: 'private-sale',
-    title: 'Private Party Sale',
-    description: 'Private sales offer no warranty protection.',
-    severity: 'low',
-    category: 'ownership',
-    expandedDetails: tier === 'paid' ? 'Unlike dealer sales, private party transactions typically do not include warranty coverage. Consider getting a pre-purchase inspection from an independent mechanic.' : undefined,
-  });
   
   // Recall flags
   if (recalls && recalls.length > 0) {
@@ -752,7 +776,7 @@ function determineVerdict(flags: RedFlag[], priceDiffPercent: number): { verdict
 
 function generateQuestionsWithTier(flags: RedFlag[], priceDiff: number, tier: AnalysisTier = 'free'): string[] {
   if (tier === 'free') {
-    // Free tier gets 1-2 essential questions based on key flags
+    // Free tier gets exactly 2 essential questions
     const questions: string[] = [];
     const flagIds = new Set(flags.map(f => f.id));
     
@@ -773,7 +797,8 @@ function generateQuestionsWithTier(flags: RedFlag[], priceDiff: number, tier: An
       questions.push('Why are you selling the vehicle?');
     }
     
-    return questions;
+    // Ensure exactly 2 questions for free tier
+    return questions.slice(0, 2);
   }
   
   // Paid tier uses the full generateQuestions function
@@ -1162,10 +1187,10 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
   if (vehicleInfo.vin) {
     knownData.push('VIN verified');
     if (vehicleHistory.nmvtis) {
-      knownData.push('NMVTIS title check completed');
+      knownData.push('Title history check completed');
     }
     if (tier === 'paid' && vehicleHistory.carfax) {
-      knownData.push('Full vehicle history report');
+      knownData.push('Complete vehicle history report');
     }
   } else {
     unknownData.push('VIN not provided');
@@ -1177,20 +1202,20 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
   if (vehicleInfo.mileage) knownData.push(`Mileage: ${vehicleInfo.mileage.toLocaleString()}`);
   
   if (marketData) {
-    if (marketData.autoDev) knownData.push('Auto.dev market listings');
+    if (marketData.autoDev) knownData.push('Market listings data');
     if (tier === 'paid') {
-      if (marketData.marketCheck) knownData.push('MarketCheck competitive pricing');
+      if (marketData.marketCheck) knownData.push('Competitive pricing data');
     }
   }
   
   if (disasterData?.femaDeclarations) {
-    knownData.push('FEMA disaster history checked');
+    knownData.push('Disaster history checked');
   }
   
   if (recalls && recalls.length > 0) {
-    knownData.push(`${recalls.length} open recall${recalls.length === 1 ? '' : 's'} found (NHTSA)`);
+    knownData.push(`${recalls.length} open recall${recalls.length === 1 ? '' : 's'} found`);
   } else if (vehicleInfo.year && vehicleInfo.make && vehicleInfo.model) {
-    knownData.push('NHTSA recall check completed (no open recalls)');
+    knownData.push('Recall check completed (no open recalls)');
   }
   
   if (tier === 'free') {
