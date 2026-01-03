@@ -10,8 +10,13 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Tempo - Modern SaaS Starter",
-  description: "A modern full-stack starter template powered by Next.js",
+  title: "RedFlagged - Used Car Analysis",
+  description: "Get a clear verdict on any used car listing. Know if it's a Deal, Caution, or Disaster before you buy.",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 5,
+  },
 };
 
 export default function RootLayout({

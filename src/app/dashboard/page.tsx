@@ -65,7 +65,7 @@ export default async function Dashboard() {
     <>
       <DashboardNavbar />
       <main className="w-full bg-gradient-to-b from-slate-50 to-white min-h-screen">
-        <div className="container mx-auto px-4 py-8 md:py-12 flex flex-col gap-8">
+        <div className="w-full px-6 md:px-8 lg:px-12 py-8 md:py-12 flex flex-col gap-8">
           {/* Header Section */}
           <header className="flex flex-col gap-4 mb-2">
             <div className="flex items-center justify-between">

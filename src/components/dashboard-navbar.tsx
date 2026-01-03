@@ -9,8 +9,9 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu'
 import { Button } from './ui/button'
-import { Flag, Home } from 'lucide-react'
+import { Home } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Logo from './logo'
 
 export default function DashboardNavbar() {
   const { signOut } = useClerk()
@@ -29,13 +30,11 @@ export default function DashboardNavbar() {
   }
 
   return (
-    <nav className="w-full border-b border-charcoal/10 bg-cream/80 backdrop-blur-sm py-3 sticky top-0 z-50">
-      <div className="container mx-auto px-4 flex justify-between items-center">
-        <div className="flex items-center gap-6">
-          <Link href="/" prefetch className="flex items-center gap-2 group">
-            <div className="p-1.5 bg-disaster rounded">
-              <Flag className="w-4 h-4 text-cream" />
-            </div>
+    <nav className="w-full border-b border-charcoal/10 bg-cream/80 backdrop-blur-sm py-1 sticky top-0 z-50 h-[70px]">
+      <div className="w-full h-full flex justify-between items-center px-6 md:px-8 lg:px-12">
+        <div className="flex items-center gap-6 h-full">
+          <Link href="/" prefetch className="flex items-center gap-2 group h-full">
+            <Logo width={150} height={150} className="flex-shrink-0 h-full w-auto object-contain" />
             <span className="font-display text-xl font-bold text-charcoal tracking-tight">
               RedFlagged
             </span>

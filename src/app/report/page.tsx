@@ -650,7 +650,7 @@ export default function ReportPage() {
     <>
       <Navbar />
       <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-8">
+        <div className="w-full px-6 md:px-8 lg:px-12 py-8">
           <AnalysisResults result={result} onReset={handleReset} />
         </div>
       </div>

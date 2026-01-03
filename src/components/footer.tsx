@@ -1,19 +1,18 @@
 import Link from 'next/link';
-import { Twitter, Flag, Mail } from 'lucide-react';
+import { Twitter, Mail } from 'lucide-react';
+import Logo from './logo';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
     <footer className="bg-slate-50 border-t border-slate-200">
-      <div className="container mx-auto px-4 py-12">
+      <div className="w-full py-12 px-6 md:px-8 lg:px-12">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           {/* Brand Column */}
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="flex items-center gap-2.5 mb-4">
-              <div className="p-1.5 bg-slate-900 rounded-lg">
-                <Flag className="w-4 h-4 text-white" />
-              </div>
+              <Logo width={72} height={72} className="flex-shrink-0" />
               <span className="text-xl font-bold text-slate-900">
                 RedFlagged
               </span>

@@ -14,7 +14,8 @@ import {
   AlertTriangle,
   Wrench,
   Share2,
-  LogIn
+  LogIn,
+  Save
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,6 +40,7 @@ const freeFeatures = [
   { name: "Seller signal analysis", included: false },
   { name: "Contextual tailored questions", included: false },
   { name: "Shareable report link", included: false },
+  { name: "Save to dashboard for later viewing", included: false },
 ];
 
 const premiumFeatures = [
@@ -47,6 +49,7 @@ const premiumFeatures = [
   { icon: Wrench, name: "Maintenance risk assessment" },
   { icon: FileText, name: "Contextual tailored questions" },
   { icon: Share2, name: "Shareable report link" },
+  { icon: Save, name: "Save to dashboard for later viewing" },
 ];
 
 export function UpgradePrompt({ reportId }: UpgradePromptProps) {

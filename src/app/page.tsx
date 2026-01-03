@@ -40,7 +40,7 @@ export default async function Home() {
         <div className="absolute inset-0 bg-scanlines opacity-40" />
         <div className="absolute inset-0 bg-gradient-to-b from-white via-transparent to-white" />
 
-        <div className="container mx-auto px-4 relative">
+        <div className="w-full px-6 md:px-8 lg:px-12 relative">
           <div className="text-center mb-10">
             <span className="inline-block px-3 py-1 bg-slate-100 border border-slate-200 text-slate-600 text-sm font-medium rounded-full mb-4">
               Try It Free
@@ -49,7 +49,7 @@ export default async function Home() {
               Check Any Vehicle Instantly
             </h2>
             <p className="text-slate-500 max-w-xl mx-auto">
-              Enter a VIN or vehicle details below. Get your verdict in
+              Enter a VIN and listing details below. Get your verdict in
               seconds—no signup required.
             </p>
           </div>
@@ -65,7 +65,7 @@ export default async function Home() {
         {/* Corner brackets */}
         <div className="absolute inset-0 bg-hud-corners opacity-40" />
 
-        <div className="container mx-auto px-4 relative">
+        <div className="w-full px-6 md:px-8 lg:px-12 relative">
           <div className="max-w-4xl mx-auto">
             {/* Problem */}
             <div className="text-center mb-16">
@@ -280,7 +280,7 @@ export default async function Home() {
         <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-slate-900 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-900 to-transparent" />
 
-        <div className="container mx-auto px-4 relative">
+        <div className="w-full px-6 md:px-8 lg:px-12 relative">
           <div className="text-center mb-14">
             <h2 className="text-3xl md:text-4xl font-bold mb-3">
               How It Works
@@ -349,7 +349,7 @@ export default async function Home() {
         {/* Scanlines for CRT texture */}
         <div className="absolute inset-0 bg-scanlines opacity-30" />
 
-        <div className="container mx-auto px-4 relative">
+        <div className="w-full px-6 md:px-8 lg:px-12 relative">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-14">
               <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">
@@ -447,7 +447,7 @@ export default async function Home() {
         {/* Gradient fade */}
         <div className="absolute inset-0 bg-gradient-to-b from-white via-transparent to-white" />
 
-        <div className="container mx-auto px-4 relative">
+        <div className="w-full px-6 md:px-8 lg:px-12 relative">
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 text-slate-600 text-sm font-medium rounded-full mb-6 shadow-sm">
               <Eye className="w-4 h-4" />
@@ -510,7 +510,7 @@ export default async function Home() {
         {/* Speed lines accent */}
         <div className="absolute inset-0 bg-speed-lines" />
 
-        <div className="container mx-auto px-4 relative">
+        <div className="w-full px-6 md:px-8 lg:px-12 relative">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">
@@ -610,6 +610,7 @@ export default async function Home() {
                     "Maintenance risk prediction",
                     "Contextual tailored questions",
                     "Shareable report link",
+                    "Save to dashboard for later viewing",
                   ].map((item, index) => (
                     <li
                       key={index}

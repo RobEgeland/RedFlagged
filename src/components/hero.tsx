@@ -164,7 +164,7 @@ export default function Hero() {
 
       {/* Main content */}
       <div className="relative z-10 pt-20 pb-24 md:pt-32 md:pb-32">
-        <div className="container mx-auto px-4">
+        <div className="w-full px-6 md:px-8 lg:px-12">
           <div className="max-w-6xl mx-auto">
             {/* Text content - above preview card */}
             <div className="text-center mb-12 md:mb-16">
