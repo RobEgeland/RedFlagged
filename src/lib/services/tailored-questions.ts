@@ -42,7 +42,7 @@ export function generateTailoredQuestions(result: VerdictResult): TailoredQuesti
       context: 'The report indicates title issues that could significantly impact vehicle value and insurability.',
       relatedFindings: result.redFlags
         .filter(f => ['title-brands', 'salvage-record', 'theft-record'].includes(f.id))
-        .map(f => f.name)
+        .map(f => f.title)
     });
   } else {
     questions.push({
@@ -225,7 +225,7 @@ export function generateTailoredQuestions(result: VerdictResult): TailoredQuesti
   if (result.environmentalRisk?.disasterPresence) {
     const recentDisasters = result.environmentalRisk.recentDisasters || [];
     if (recentDisasters.length > 0) {
-      const disasterTypes = [...new Set(recentDisasters.map(d => d.disasterType))].join(', ');
+      const disasterTypes = Array.from(new Set(recentDisasters.map(d => d.disasterType))).join(', ');
       questions.push({
         question: `This area has experienced ${disasterTypes} in recent years. Has this vehicle been exposed to flooding, water damage, or other weather-related issues?`,
         category: 'environmental',

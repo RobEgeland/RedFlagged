@@ -33,7 +33,7 @@ export function VehicleAnalyzer() {
         verdict: analysisResult.verdict,
         has_red_flags: (analysisResult.redFlags?.length || 0) > 0,
         red_flags_count: analysisResult.redFlags?.length || 0,
-        estimated_value: analysisResult.estimatedValue,
+        estimated_value: analysisResult.vehicleInfo?.estimatedValue,
         asking_price: data.askingPrice,
       });
       

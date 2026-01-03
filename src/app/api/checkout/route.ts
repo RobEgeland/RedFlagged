@@ -15,10 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Initialize Stripe client
-    const stripe = new Stripe(stripeSecretKey, {
-      apiVersion: "2024-12-18.acacia",
-      typescript: true,
-    });
+    const stripe = new Stripe(stripeSecretKey);
 
     // Parse request body
     const body = await request.json();

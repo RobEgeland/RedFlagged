@@ -29,6 +29,10 @@ interface AutoDevListing {
   retailListing?: {
     miles?: number;
     price?: number;
+    city?: string;
+    state?: string;
+    zip?: string;
+    dealer?: string;
   };
   [key: string]: any;
 }
@@ -204,7 +208,6 @@ async function fetchFromAutoDevListingsAPI(
         allPriceFields: {
           price: listings[0]?.price,
           'retailListing.price': listings[0]?.retailListing?.price,
-          'vehicle.price': listings[0]?.vehicle?.price
         }
       });
     }
@@ -676,29 +679,16 @@ async function fetchMarketCheckSalesStats(
         console.warn('[MarketCheck] Sales Stats API error:', response.status, response.statusText);
         return null;
       }
-    } catch (fetchError: any) {
-      clearTimeout(timeoutId);
       
-      // Check if it's a DNS/network error
-      if (fetchError.name === 'AbortError') {
-        console.error('[MarketCheck] Request timeout - DNS or network issue');
-        throw new Error('MarketCheck API request timed out - possible DNS or network connectivity issue');
-      } else if (fetchError.code === 'ENOTFOUND' || fetchError.message?.includes('getaddrinfo')) {
-        console.error('[MarketCheck] DNS resolution failed:', fetchError.message);
-        throw new Error('MarketCheck API DNS resolution failed - check network connectivity');
+      const responseText = await response.text();
+      let data: MarketCheckSalesStatsResponse;
+      
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('[MarketCheck] Failed to parse response:', responseText.substring(0, 200));
+        return null;
       }
-      throw fetchError;
-    }
-    
-    const responseText = await response.text();
-    let data: MarketCheckSalesStatsResponse;
-    
-    try {
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('[MarketCheck] Failed to parse response:', responseText.substring(0, 200));
-      return null;
-    }
     
     if (!data.sales_stats || !data.sales_stats.avg_price) {
       console.log('[MarketCheck] No sales stats data available');
@@ -723,7 +713,20 @@ async function fetchMarketCheckSalesStats(
       priceRange: result.priceRange
     });
     
-    return result;
+      return result;
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      
+      // Check if it's a DNS/network error
+      if (fetchError.name === 'AbortError') {
+        console.error('[MarketCheck] Request timeout - DNS or network issue');
+        throw new Error('MarketCheck API request timed out - possible DNS or network connectivity issue');
+      } else if (fetchError.code === 'ENOTFOUND' || fetchError.message?.includes('getaddrinfo')) {
+        console.error('[MarketCheck] DNS resolution failed:', fetchError.message);
+        throw new Error('MarketCheck API DNS resolution failed - check network connectivity');
+      }
+      throw fetchError;
+    }
   } catch (error: any) {
     // Re-throw DNS/network errors so they can be handled upstream
     if (error.message?.includes('DNS') || error.message?.includes('timeout') || error.message?.includes('network')) {

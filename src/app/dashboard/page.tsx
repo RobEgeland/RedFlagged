@@ -48,10 +48,10 @@ export default async function Dashboard() {
       // Count reports from last 30 days
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      recentReportsCount = reports.filter(r => new Date(r.created_at) >= thirtyDaysAgo).length;
+      recentReportsCount = reports.filter((r: { created_at: string }) => new Date(r.created_at) >= thirtyDaysAgo).length;
       
       // Count verdicts
-      reports.forEach(report => {
+      reports.forEach((report: { verdict?: string }) => {
         if (report.verdict === 'deal') verdictBreakdown.deal++;
         else if (report.verdict === 'caution') verdictBreakdown.caution++;
         else if (report.verdict === 'disaster') verdictBreakdown.disaster++;

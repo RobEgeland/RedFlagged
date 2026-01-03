@@ -119,7 +119,7 @@ export function SellerSignalsCard({
                     volatilityLevel === 'medium' ? 'text-orange-700 bg-orange-100' :
                     'text-yellow-700 bg-yellow-100'
                   }`}>
-                    {volatilityLevel.toUpperCase()} risk
+                    {volatilityLevel?.toUpperCase() || 'UNKNOWN'} risk
                   </span>
                 </div>
                 <p className="text-sm text-gray-700 mb-3">

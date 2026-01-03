@@ -259,6 +259,7 @@ function generateRedFlagsFromAllData(
   dataSourceResults: {
     vehicleHistory: any;
     disasterData: any;
+    environmentalRisk?: any;
     sellerSignals: any;
     recalls?: any;
   },
@@ -452,9 +453,9 @@ function generateRedFlagsFromAllData(
   // Environmental risk flags (probabilistic, never alone causes Disaster verdict)
   if (environmentalRisk && environmentalRisk.disasterPresence) {
     const hasRecentDisasters = environmentalRisk.recency === 'recent';
-    const hasFloodRisk = environmentalRisk.floodZoneRisk === 'high' || 
-                        environmentalRisk.disasterTypes.some(type => 
-                          type.toLowerCase().includes('flood') || 
+    const hasFloodRisk = environmentalRisk.floodZoneRisk === 'high' ||
+                        environmentalRisk.disasterTypes.some((type: string) =>
+                          type.toLowerCase().includes('flood') ||
                           type.toLowerCase().includes('hurricane')
                         );
     
@@ -884,7 +885,7 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
   }
   
   // Fetch vehicle history FIRST if VIN is provided, so we can get vehicle details for market data
-  let vehicleHistory = { nmvtis: null, carfax: null };
+  let vehicleHistory: { nmvtis: any; carfax: any } = { nmvtis: null, carfax: null };
   if (request.vin) {
     try {
       const nmvtis = await fetchNMVTISData(request.vin);
@@ -931,7 +932,7 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
   const dataFetchPromises: Promise<any>[] = [];
   
   // Market listings data - now we have vehicle details from VIN decode
-  let marketDataPromise = Promise.resolve(null);
+  let marketDataPromise: Promise<any> = Promise.resolve(null);
   if (vehicleInfo.year && vehicleInfo.make && vehicleInfo.model) {
     console.log('[Analysis] Fetching market data for:', { 
       year: vehicleInfo.year, 
@@ -962,14 +963,14 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
   dataFetchPromises.push(disasterDataPromise);
   
   // Environmental risk analysis (based on location)
-  let environmentalRiskPromise = Promise.resolve(null);
+  let environmentalRiskPromise: Promise<any> = Promise.resolve(null);
   if (request.location) {
     environmentalRiskPromise = analyzeEnvironmentalRisk(request.location);
   }
   dataFetchPromises.push(environmentalRiskPromise);
   
   // Seller signals (available for all tiers, but some features may be premium-only)
-  let sellerSignalsPromise = Promise.resolve(null);
+  let sellerSignalsPromise: Promise<any> = Promise.resolve(null);
   if (request.vin) {
     sellerSignalsPromise = analyzeAllSellerSignals(
       request.vin,
@@ -1379,7 +1380,10 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
     // Seller analysis
     if (sellerSignals) {
       const credibility = calculateSellerCredibilityScore(sellerSignals);
-      result.sellerAnalysis = credibility;
+      result.sellerAnalysis = {
+        credibilityScore: credibility.score,
+        insights: credibility.insights
+      };
     }
     
     // Tailored questions (comprehensive, report-specific questions)
@@ -1400,14 +1404,16 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
     // Enhance with detailed price context from market pricing analysis if available
     if (result.marketPricingAnalysis) {
       const mpa = result.marketPricingAnalysis;
-      if (verdict === 'deal' && mpa.askingPricePosition === 'significantly_below') {
-        summary = `This appears to be a solid deal. Market pricing analysis shows the asking price is significantly below comparable listings (${mpa.percentilePosition ? `${100 - mpa.percentilePosition}th` : 'lower'} percentile). ${summary}`;
-      } else if (verdict === 'deal' && mpa.askingPricePosition === 'at_or_below_median') {
+      if (verdict === 'deal' && mpa.askingPricePosition?.position === 'below' && mpa.askingPricePosition.differencePercent < -10) {
+        const percentile = mpa.askingPricePosition.percentile;
+        summary = `This appears to be a solid deal. Market pricing analysis shows the asking price is significantly below comparable listings (${percentile ? `${100 - percentile}th` : 'lower'} percentile). ${summary}`;
+      } else if (verdict === 'deal' && mpa.askingPricePosition?.position === 'below' && mpa.askingPricePosition.differencePercent >= -10) {
         summary = `This vehicle is priced reasonably. Market pricing analysis indicates the asking price is at or below the median of comparable listings. ${summary}`;
-      } else if (verdict === 'caution' && mpa.askingPricePosition === 'significantly_above') {
-        summary = `Market pricing analysis shows the asking price is significantly above comparable listings (${mpa.percentilePosition ? `${mpa.percentilePosition}th` : 'higher'} percentile). ${summary}`;
-      } else if (verdict === 'caution' && mpa.negotiationLeverage?.level === 'weak') {
-        summary = `${summary} Market pricing analysis indicates weak negotiation leverage.`;
+      } else if (verdict === 'caution' && mpa.askingPricePosition?.position === 'above' && mpa.askingPricePosition.differencePercent > 10) {
+        const percentile = mpa.askingPricePosition.percentile;
+        summary = `Market pricing analysis shows the asking price is significantly above comparable listings (${percentile ? `${percentile}th` : 'higher'} percentile). ${summary}`;
+      } else if (verdict === 'caution' && mpa.negotiationLeverage?.level === 'limited') {
+        summary = `${summary} Market pricing analysis indicates limited negotiation leverage.`;
       }
     } else {
       // Fallback to basic price context if market pricing analysis not available
@@ -1427,7 +1433,9 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
     }
     
     // Add environmental risk context if not already mentioned
-    if (result.environmentalRisk && result.environmentalRisk.overallRisk === 'high' && 
+    if (result.environmentalRisk && 
+        (result.environmentalRisk.floodZoneRisk === 'high' || 
+         (result.environmentalRisk.disasterPresence && result.environmentalRisk.recency === 'recent')) &&
         !summary.includes('environmental') && !summary.includes('water damage')) {
       summary = `${summary} Environmental risk assessment indicates high exposure to disaster events.`;
     }

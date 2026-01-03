@@ -939,8 +939,15 @@ export function calculateSellerCredibilityScore(signals: {
   }
   
   // Pricing behavior analysis
-  if (signals.pricingBehavior?.priceVolatility?.hasChanged) {
-    const increases = signals.pricingBehavior.priceVolatility.priceIncreases || 0;
+  if (signals.pricingBehavior?.priceVolatility?.detected) {
+    // Check if there are any price increases in the history
+    const priceHistory = signals.pricingBehavior.priceVolatility.priceHistory || [];
+    const increases = priceHistory.filter((entry, index) => {
+      if (index === 0) return false;
+      const prevEntry = priceHistory[index - 1];
+      return entry.price > prevEntry.price;
+    }).length;
+    
     if (increases > 0) {
       score -= increases * 3;
       insights.push(`Price has been increased ${increases} time${increases === 1 ? '' : 's'} - unusual for private sales`);

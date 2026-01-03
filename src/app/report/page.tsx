@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { usePostHog } from "posthog-js/react";
@@ -147,7 +147,7 @@ function generateComparableListingsFromMarketData(
   return listings.sort((a, b) => a.price - b.price);
 }
 
-export default function ReportPage() {
+function ReportPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { isSignedIn, user } = useUser();
@@ -600,7 +600,7 @@ export default function ReportPage() {
       
       // Track report save error
       posthog?.capture("report_save_error", {
-        report_id: currentReportId,
+        report_id: reportId || "unknown",
         error: err.message || "Network error",
       });
       
@@ -655,6 +655,19 @@ export default function ReportPage() {
         </div>
       </div>
     </>
+  );
+}
+
+export default function ReportPage() {
+  return (
+    <Suspense fallback={
+      <>
+        <Navbar />
+        <AnalysisLoading />
+      </>
+    }>
+      <ReportPageContent />
+    </Suspense>
   );
 }
 

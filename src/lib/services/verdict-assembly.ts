@@ -54,7 +54,7 @@ function categorizeFlags(flags: RedFlag[]): {
       flag.id === 'accident-history' ||
       flag.id === 'environmental-risk' ||
       flag.id === 'disaster-risk' ||
-      (flag.category === 'disaster' && flag.severity === 'high' || flag.severity === 'critical')
+      (flag.category === 'disaster' && (flag.severity === 'high' || flag.severity === 'critical'))
     ) {
       structural.push(flag);
     }
@@ -162,20 +162,22 @@ function assessMarketPositionContribution(
   if (!marketPricing) return null;
   
   // Unfavorable: high percentile (overpriced) with weak negotiation leverage
-  if (marketPricing.percentilePosition && marketPricing.negotiationLeverage) {
-    if (marketPricing.percentilePosition >= 75 && marketPricing.negotiationLeverage === 'weak') {
+  if (marketPricing.askingPricePosition?.percentile && marketPricing.negotiationLeverage) {
+    const percentile = marketPricing.askingPricePosition.percentile;
+    const leverageLevel = marketPricing.negotiationLeverage.level;
+    if (percentile >= 75 && leverageLevel === 'limited') {
       return 'unfavorable';
     }
-    if (marketPricing.percentilePosition <= 25 && marketPricing.negotiationLeverage === 'strong') {
+    if (percentile <= 25 && leverageLevel === 'strong') {
       return 'favorable';
     }
   }
   
   // Check asking price position
-  if (marketPricing.askingPricePosition === 'significantly_above') {
+  if (marketPricing.askingPricePosition?.position === 'above' && marketPricing.askingPricePosition.differencePercent > 10) {
     return 'unfavorable';
   }
-  if (marketPricing.askingPricePosition === 'significantly_below') {
+  if (marketPricing.askingPricePosition?.position === 'below' && marketPricing.askingPricePosition.differencePercent < -10) {
     return 'favorable';
   }
   
@@ -190,8 +192,13 @@ function assessEnvironmentalRiskContribution(
 ): 'low' | 'medium' | 'high' | null {
   if (!environmentalRisk) return null;
   
-  if (environmentalRisk.overallRisk === 'high') return 'high';
-  if (environmentalRisk.overallRisk === 'medium') return 'medium';
+  // Determine risk level based on available data
+  if (environmentalRisk.floodZoneRisk === 'high' || (environmentalRisk.disasterPresence && environmentalRisk.recency === 'recent')) {
+    return 'high';
+  }
+  if (environmentalRisk.floodZoneRisk === 'medium' || (environmentalRisk.disasterPresence && environmentalRisk.recency === 'historical')) {
+    return 'medium';
+  }
   return 'low';
 }
 
@@ -483,10 +490,7 @@ export function assembleVerdict(
   // Strong structural risk without additional signals -> Caution (not Disaster)
   if (hasStrongStructural && marketCount === 0 && sellerBehaviorCount === 0 && 
       maintenanceRisk !== 'elevated' && marketPosition !== 'unfavorable') {
-    let explanation = `Strong structural risk detected (${structural.filter(f => f.severity === 'critical' || f.severity === 'high').map(f => f.title).join(', ')}), but no additional confirming signals from market or seller behavior. Proceed with extreme caution and thorough inspection.`;
-    if (maintenanceRisk === 'elevated') {
-      explanation += ' Elevated maintenance risk adds to concerns.';
-    }
+    const explanation = `Strong structural risk detected (${structural.filter(f => f.severity === 'critical' || f.severity === 'high').map(f => f.title).join(', ')}), but no additional confirming signals from market or seller behavior. Proceed with extreme caution and thorough inspection.`;
     
     return {
       verdict: 'caution',

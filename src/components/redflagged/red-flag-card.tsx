@@ -11,7 +11,9 @@ import {
   FileQuestion,
   ClipboardList,
   Users,
-  AlertCircle
+  AlertCircle,
+  AlertTriangle,
+  UserX
 } from "lucide-react";
 
 interface RedFlagCardProps {
@@ -20,13 +22,15 @@ interface RedFlagCardProps {
   tier?: AnalysisTier;
 }
 
-const categoryIcons = {
+const categoryIcons: Record<string, typeof Flag> = {
   pricing: DollarSign,
   history: FileWarning,
   title: FileQuestion,
   'data-gap': AlertCircle,
   listing: ClipboardList,
   ownership: Users,
+  disaster: AlertTriangle,
+  seller: UserX,
 };
 
 const severityConfig = {
