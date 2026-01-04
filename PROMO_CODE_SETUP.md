@@ -18,10 +18,13 @@ Promo codes allow users to enter discount codes directly on the Stripe checkout 
 2. **Type**: Select **Percentage**
 3. **Percent off**: Enter `100`
 4. **Duration**: Select **Once** (one-time use per customer) or **Forever** (unlimited uses per customer)
-5. **Redemption limits** (optional):
+5. **Applies to**: **IMPORTANT** - Select **"All products"** (not "Specific products")
+   - This is required because your checkout uses dynamic pricing
+   - If you select "Specific products", the code won't work with your checkout
+6. **Redemption limits** (optional):
    - **Max redemptions**: Set a total limit (e.g., 100 uses total)
    - **Redeem by**: Set an expiration date
-6. Click **Create coupon**
+7. Click **Create coupon**
 
 ### For Other Discount Types
 
@@ -146,12 +149,26 @@ Each code can link to the same coupon or different coupons.
    - Hard refresh the page (Ctrl+Shift+R or Cmd+Shift+R)
    - Try in an incognito/private window
 
-### Code not applying discount
+### Code not applying discount / "This code is valid, but doesn't apply to items in your order"
 
+**This error means the coupon has restrictions that don't match your checkout items.**
+
+**Solution**: Your checkout uses dynamic pricing (`price_data`), so the coupon must be configured to work with **any product**:
+
+1. Go to Stripe Dashboard → **Products** → **Coupons**
+2. Click on the coupon linked to your promo code
+3. Check the **"Applies to"** section:
+   - **Must be set to "All products"** (not "Specific products")
+   - If it's set to "Specific products", change it to "All products"
+4. Save the changes
+5. Try the promo code again
+
+**Other things to check:**
 - Check the code is active in Stripe Dashboard
 - Verify the code hasn't expired
 - Check if usage limits have been reached
 - Ensure the code matches exactly (case-insensitive)
+- Check if there's a minimum amount requirement that your order doesn't meet
 
 ### $0 payment not completing
 
