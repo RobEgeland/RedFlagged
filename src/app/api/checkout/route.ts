@@ -38,12 +38,20 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: "payment", // One-time payment
+      allow_promotion_codes: true, // Enable promo code field on checkout page
       success_url: `${request.nextUrl.origin}/report?session_id={CHECKOUT_SESSION_ID}&report_id=${reportId || "unknown"}`,
       cancel_url: `${request.nextUrl.origin}/report?canceled=true`,
       customer_email: email || undefined,
       metadata: {
         reportId: reportId || "unknown",
       },
+    });
+
+    // Log session details for debugging
+    console.log("[Checkout] Session created:", {
+      sessionId: session.id,
+      url: session.url,
+      allowPromotionCodes: true, // Confirming it's set
     });
 
     return NextResponse.json({ url: session.url });
