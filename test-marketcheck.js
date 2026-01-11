@@ -44,7 +44,7 @@ const testParams = {
   model: 'Camry'
 };
 
-const apiUrl = process.env.MARKETCHECK_API_URL || 'https://marketcheck-prod.apigee.net/v1';
+const apiUrl = process.env.MARKETCHECK_API_URL || 'https://api.marketcheck.com/v2';
 const endpoint = `${apiUrl}/stats/cars/sales_stats`;
 
 const params = new URLSearchParams({

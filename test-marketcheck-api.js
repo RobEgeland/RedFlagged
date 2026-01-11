@@ -11,7 +11,7 @@ const testMarketCheck = async () => {
 
   const apiKey = process.env.MARKETCHECK_API_KEY;
   const apiUrl =
-    process.env.MARKETCHECK_API_URL || "https://marketcheck-prod.apigee.net/v1";
+    process.env.MARKETCHECK_API_URL || "https://api.marketcheck.com/v2";
 
   if (!apiKey) {
     console.error("❌ MARKETCHECK_API_KEY not found in environment variables");

@@ -906,12 +906,30 @@ export async function analyzeVehicle(request: AnalysisRequest): Promise<VerdictR
   // This ensures we have year/make/model for market data fetching
   if (vehicleHistory?.nmvtis?.vehicleDetails) {
     const autoDevDetails = vehicleHistory.nmvtis.vehicleDetails;
+    
+    // Helper to check if a make value is valid (not a placeholder from NHTSA)
+    // NHTSA VIN decode sometimes returns "Reserved" or other placeholders for makes
+    const isValidMake = (make: string | undefined): boolean => {
+      if (!make) return false;
+      const invalidMakes = ['reserved', 'unknown', 'n/a', 'na', 'other', 'misc', 'general'];
+      return !invalidMakes.includes(make.toLowerCase().trim());
+    };
+    
+    // Use Auto.dev make only if it's valid, otherwise fall back to user input
+    const resolvedMake = isValidMake(autoDevDetails.make) 
+      ? autoDevDetails.make 
+      : (vehicleInfo.make || request.make);
+    
+    if (autoDevDetails.make && !isValidMake(autoDevDetails.make)) {
+      console.log('[Analysis] Auto.dev returned invalid make:', autoDevDetails.make, '- using user input:', vehicleInfo.make || request.make);
+    }
+    
     vehicleInfo = {
       ...vehicleInfo,
       // Prefer Auto.dev data as it's more accurate from VIN decode
       // But keep manual year entry if Auto.dev doesn't provide year
       year: autoDevDetails.year || vehicleInfo.year || request.year,
-      make: autoDevDetails.make || vehicleInfo.make,
+      make: resolvedMake,
       model: autoDevDetails.model || vehicleInfo.model,
       trim: autoDevDetails.trim || vehicleInfo.trim,
     };

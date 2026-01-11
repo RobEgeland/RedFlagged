@@ -61,6 +61,66 @@ function isClientSide(): boolean {
   return typeof window !== 'undefined';
 }
 
+/**
+ * Parse model names with embedded variants/trims
+ * Many vehicles have trim designations embedded in the model name from VIN decode:
+ * - "RX 450h" -> model: "RX", trim: "450h" (Lexus hybrid)
+ * - "Camry Hybrid" -> model: "Camry", trim: "Hybrid" (Toyota hybrid)
+ * - "Model 3" -> model: "Model 3" (Tesla, keep as-is)
+ * - "F-150" -> model: "F-150" (Ford truck, keep as-is)
+ */
+function parseModelNameVariants(modelName: string, existingTrim?: string): { model: string; trim?: string } {
+  if (!modelName) {
+    return { model: modelName };
+  }
+  
+  // If we already have a trim, don't try to parse one from the model name
+  if (existingTrim) {
+    return { model: modelName, trim: existingTrim };
+  }
+  
+  // Patterns for hybrid/electric variants embedded in model names
+  // Order matters: more specific patterns first
+  const variantPatterns: Array<{ regex: RegExp; description: string }> = [
+    // Lexus hybrid pattern: "RX 450h", "ES 300h", "NX 450h+", "LC 500h"
+    { regex: /^([A-Z]{2,3})\s+(\d{3}h\+?)$/i, description: 'Lexus hybrid (RX 450h)' },
+    
+    // General hybrid pattern with "h" suffix: "Accord 2.0h", "Sonata 2.5h"
+    { regex: /^(.+?)\s+(\d+\.?\d*h)$/i, description: 'Numeric hybrid trim' },
+    
+    // "Hybrid" suffix: "Camry Hybrid", "Accord Hybrid", "Highlander Hybrid"
+    { regex: /^(.+?)\s+(Hybrid)$/i, description: 'Hybrid suffix' },
+    
+    // Plug-in hybrid: "Prius Prime", "RAV4 Prime"
+    { regex: /^(.+?)\s+(Prime)$/i, description: 'Prime (PHEV)' },
+    
+    // Electric variants: "PHEV", "EV", "Electric"
+    { regex: /^(.+?)\s+(PHEV|BEV|EV|Electric)$/i, description: 'Electric variant' },
+    
+    // Audi e-tron variants: "Q4 e-tron", "e-tron GT"
+    { regex: /^(.+?)\s+(e-tron(?:\s+GT)?)$/i, description: 'Audi e-tron' },
+    
+    // BMW i variants: "X3 xDrive30e", "330e"
+    { regex: /^(.+?)\s+(xDrive\d+e|\d+e)$/i, description: 'BMW plug-in hybrid' },
+    
+    // Mercedes EQ variants: "EQS 450+", "EQE 350"
+    { regex: /^(EQ[A-Z])\s+(\d+\+?)$/i, description: 'Mercedes EQ' },
+  ];
+  
+  for (const pattern of variantPatterns) {
+    const match = modelName.match(pattern.regex);
+    if (match) {
+      const parsedModel = match[1].trim();
+      const parsedTrim = match[2].trim();
+      console.log(`[Model Parser] Parsed "${modelName}" -> model: "${parsedModel}", trim: "${parsedTrim}" (${pattern.description})`);
+      return { model: parsedModel, trim: parsedTrim };
+    }
+  }
+  
+  // No variant pattern matched, return as-is
+  return { model: modelName };
+}
+
 
 /**
  * Fetch vehicle listings from Auto.dev Listings API
@@ -78,8 +138,6 @@ async function fetchFromAutoDevListingsAPI(
 ): Promise<AutoDevListing[]> {
   try {
     // Build query parameters
-    // Note: We don't include trim or exact mileage as they're too restrictive
-    // Auto.dev will return listings that match year/make/model, and we'll filter/average them
     const params = new URLSearchParams();
     
     if (filters.year) {
@@ -88,22 +146,39 @@ async function fetchFromAutoDevListingsAPI(
     if (filters.make) {
       params.append('vehicle.make', filters.make);
     }
+    
+    // Parse model name to extract embedded trim/variant (e.g., "RX 450h" -> model: "RX", trim: "450h")
+    let modelName = filters.model || '';
+    let parsedTrim = filters.trim;
+    
     if (filters.model) {
-      // Clean up model name - remove body style suffixes that might not match
-      // e.g., "Civic Coupe" -> "Civic", "Accord Sedan" -> "Accord"
-      let modelName = filters.model;
+      // First, remove body style suffixes
       const bodyStyles = ['Coupe', 'Sedan', 'Hatchback', 'Wagon', 'SUV', 'Truck', 'Van', 'Convertible'];
       for (const style of bodyStyles) {
         if (modelName.endsWith(` ${style}`)) {
           modelName = modelName.replace(` ${style}`, '').trim();
-          console.log('[Auto.dev Listings] Simplified model name:', filters.model, '->', modelName);
+          console.log('[Auto.dev Listings] Removed body style:', filters.model, '->', modelName);
           break;
         }
       }
+      
+      // Then, parse for hybrid/variant patterns
+      const parsed = parseModelNameVariants(modelName, filters.trim);
+      modelName = parsed.model;
+      if (parsed.trim && !filters.trim) {
+        parsedTrim = parsed.trim;
+        console.log('[Auto.dev Listings] Extracted trim from model name:', filters.model, '-> model:', modelName, ', trim:', parsedTrim);
+      }
+      
       params.append('vehicle.model', modelName);
     }
-    // Skip trim - too specific and may not match listings
-    // Skip exact mileage - too restrictive, we'll calculate average from all matching listings
+    
+    // Include trim in the query for hybrid/variant vehicles to get better matching
+    // This is important for vehicles like "RX 450h" where the hybrid trim affects pricing significantly
+    if (parsedTrim) {
+      params.append('vehicle.trim', parsedTrim);
+      console.log('[Auto.dev Listings] Including trim in query:', parsedTrim);
+    }
     
     const url = `${apiUrl}/listings?${params.toString()}`;
     console.log('[Auto.dev Listings] ===== LISTINGS API CALL =====');
@@ -487,25 +562,69 @@ export async function fetchAutoDevData(
     
     // Server-side: Fetch listings directly from Auto.dev
     console.log('[Auto.dev Listings] Server-side call, fetching directly from Auto.dev');
-    const listings = await fetchFromAutoDevListingsAPI(
-      { year, make, model, trim, mileage },
+    
+    // First, try to parse the model name to extract any embedded trim (e.g., "RX 450h")
+    const parsed = parseModelNameVariants(model, trim);
+    const effectiveTrim = parsed.trim || trim;
+    const effectiveModel = parsed.model;
+    
+    if (parsed.trim && !trim) {
+      console.log('[Auto.dev Listings] Parsed hybrid/variant model:', model, '-> model:', effectiveModel, ', trim:', effectiveTrim);
+    }
+    
+    // First attempt: Try with the trim (important for hybrids like RX 450h)
+    let listings = await fetchFromAutoDevListingsAPI(
+      { year, make, model: effectiveModel, trim: effectiveTrim, mileage },
       config.apiKey,
       config.apiUrl
     );
     
-    console.log('[Auto.dev Listings] Received listings:', {
+    console.log('[Auto.dev Listings] First attempt (with trim) received listings:', {
       count: listings.length,
-      listings: listings.map((l, i) => ({
-        index: i,
-        id: l.id,
-        price: l.price,
-        retailListingPrice: l.retailListing?.price,
-        vehicle: l.vehicle
-      }))
+      trim: effectiveTrim,
+      model: effectiveModel
     });
     
+    // Fallback: If no results with trim, try without trim
+    if (listings.length === 0 && effectiveTrim) {
+      console.log('[Auto.dev Listings] No listings with trim, trying without trim...');
+      listings = await fetchFromAutoDevListingsAPI(
+        { year, make, model: effectiveModel, mileage },
+        config.apiKey,
+        config.apiUrl
+      );
+      console.log('[Auto.dev Listings] Fallback (no trim) received listings:', listings.length);
+      
+      // If we got results without trim, filter to prefer listings that match our trim
+      if (listings.length > 0 && effectiveTrim) {
+        const trimLower = effectiveTrim.toLowerCase();
+        const trimMatchingListings = listings.filter(l => {
+          const listingTrim = l.vehicle?.trim?.toLowerCase() || '';
+          return listingTrim.includes(trimLower) || trimLower.includes(listingTrim);
+        });
+        
+        if (trimMatchingListings.length >= 3) {
+          console.log('[Auto.dev Listings] Filtered to trim-matching listings:', trimMatchingListings.length, 'of', listings.length);
+          listings = trimMatchingListings;
+        } else {
+          console.log('[Auto.dev Listings] Not enough trim-matching listings, using all:', listings.length);
+        }
+      }
+    }
+    
+    console.log('[Auto.dev Listings] Final listings count:', listings.length);
+    if (listings.length > 0) {
+      console.log('[Auto.dev Listings] Sample listings:', listings.slice(0, 3).map((l, i) => ({
+        index: i,
+        id: l.id,
+        price: l.retailListing?.price || l.price,
+        trim: l.vehicle?.trim,
+        mileage: l.retailListing?.miles
+      })));
+    }
+    
     if (listings.length === 0) {
-      console.warn('[Auto.dev Listings] No listings found');
+      console.warn('[Auto.dev Listings] No listings found after all attempts');
       return null;
     }
     
@@ -590,31 +709,86 @@ interface MarketCheckConfig {
 
 /**
  * Get MarketCheck API configuration from environment variables
+ * Note: MarketCheck migrated from marketcheck-prod.apigee.net to api.marketcheck.com in 2024
+ * We always use the new URL regardless of environment variable to prevent using deprecated endpoints
  */
 function getMarketCheckConfig(): MarketCheckConfig {
+  // Always use the new MarketCheck API URL - the old apigee.net domain is deprecated
+  const MARKETCHECK_V2_URL = 'https://api.marketcheck.com/v2';
+  
+  // Check if user has old deprecated URL configured and warn them
+  const configuredUrl = process.env.MARKETCHECK_API_URL;
+  if (configuredUrl && configuredUrl.includes('apigee.net')) {
+    console.warn('[MarketCheck] Deprecated API URL detected in MARKETCHECK_API_URL. Using new URL:', MARKETCHECK_V2_URL);
+  }
+  
   return {
     apiKey: process.env.MARKETCHECK_API_KEY,
-    apiUrl: process.env.MARKETCHECK_API_URL || 'https://marketcheck-prod.apigee.net/v1',
+    apiUrl: MARKETCHECK_V2_URL,  // Always use new URL
   };
 }
 
 /**
- * MarketCheck Sales Stats API Response
+ * MarketCheck v2 API Response for /sales/car
+ * Returns sales statistics from the last 90 days
+ * Documentation: https://docs.marketcheck.com
  */
-interface MarketCheckSalesStatsResponse {
-  sales_stats?: {
-    avg_price?: number;
-    median_price?: number;
-    sales_count?: number;
-    min_price?: number;
-    max_price?: number;
+interface MarketCheckSalesResponse {
+  mean?: number;
+  median?: number;
+  count?: number;
+  min?: number;
+  max?: number;
+  std_deviation?: number;
+  price_range?: {
+    min?: number;
+    max?: number;
+  };
+  // Additional fields that might be returned
+  [key: string]: any;
+}
+
+/**
+ * MarketCheck v2 API Response for /search/car/active (fallback)
+ * Documentation: https://docs.marketcheck.com
+ */
+interface MarketCheckV2Response {
+  num_found?: number;
+  listings?: Array<{
+    id?: string;
+    price?: number;
+    miles?: number;
+    city?: string;
+    state?: string;
+    dealer?: {
+      name?: string;
+      city?: string;
+      state?: string;
+    };
+    build?: {
+      year?: number;
+      make?: string;
+      model?: string;
+      trim?: string;
+    };
+  }>;
+  stats?: {
+    price?: {
+      mean?: number;
+      median?: number;
+      min?: number;
+      max?: number;
+      count?: number;
+      std_deviation?: number;
+    };
   };
   [key: string]: any;
 }
 
 /**
- * Fetch MarketCheck Sales Stats API data
- * This provides inferred sales figures over the past 90 days as a backup when Auto.dev has no listings
+ * Fetch MarketCheck v2 API data using /sales/car endpoint (primary)
+ * This provides actual sales statistics from the last 90 days - most accurate for market valuation
+ * Falls back to /search/car/active if sales data isn't available
  */
 async function fetchMarketCheckSalesStats(
   year: number,
@@ -627,6 +801,7 @@ async function fetchMarketCheckSalesStats(
     // Clean up model name for MarketCheck API
     // Remove common suffixes and extra details that might not match API expectations
     let cleanModel = model;
+    let parsedTrim: string | undefined;
     
     // Remove body style suffixes
     const bodyStyles = ['Coupe', 'Sedan', 'Hatchback', 'Wagon', 'SUV', 'Truck', 'Van', 'Convertible', 'DRW', 'SRW'];
@@ -636,103 +811,243 @@ async function fetchMarketCheckSalesStats(
       }
     }
     
-    // For "Super Duty" models, try both with and without "Super Duty"
-    // MarketCheck might expect just "F-350" or "Super Duty"
+    // For "Super Duty" models, simplify the model name
     if (cleanModel.includes('Super Duty')) {
-      // Try with "Super Duty" first, then fallback to just the model number
       const superDutyMatch = cleanModel.match(/Super Duty\s+(.+)/i);
       if (superDutyMatch) {
         cleanModel = `Super Duty ${superDutyMatch[1].trim()}`;
       }
     }
     
-    console.log('[MarketCheck] Model name cleaned:', model, '->', cleanModel);
+    // Parse hybrid/variant model names (e.g., "RX 450h" -> model: "RX", trim: "450h")
+    const parsed = parseModelNameVariants(cleanModel);
+    if (parsed.trim) {
+      cleanModel = parsed.model;
+      parsedTrim = parsed.trim;
+      console.log('[MarketCheck] Parsed hybrid/variant model:', model, '-> model:', cleanModel, ', trim:', parsedTrim);
+    }
     
-    // MarketCheck Sales Stats API endpoint
-    // Documentation: https://docs.marketcheck.com/docs/api/cars/market/sales-stats
-    const params = new URLSearchParams({
+    console.log('[MarketCheck] Model name cleaned:', model, '->', cleanModel, parsedTrim ? `(trim: ${parsedTrim})` : '');
+    
+    // STEP 1: Try /v2/sales/car endpoint first (actual sales data from last 90 days)
+    const salesParams = new URLSearchParams({
+      api_key: apiKey,
       year: year.toString(),
       make: make,
       model: cleanModel,
-      api_key: apiKey,
     });
     
-    const url = `${apiUrl}/stats/cars/sales_stats?${params.toString()}`;
-    console.log('[MarketCheck] Fetching sales stats from:', url.replace(apiKey, '***'));
+    // Add trim parameter for hybrids/variants to get more accurate pricing
+    if (parsedTrim) {
+      salesParams.append('trim', parsedTrim);
+    }
     
-    // Add timeout to fetch to help with DNS issues
+    const salesUrl = `${apiUrl}/sales/car?${salesParams.toString()}`;
+    console.log('[MarketCheck] Fetching sales stats from /v2/sales/car:', salesUrl.replace(apiKey, '***'));
+    
+    // Add timeout to fetch
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
     
     try {
-      const response = await fetch(url, {
+      const salesResponse = await fetch(salesUrl, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         signal: controller.signal,
       });
       
       clearTimeout(timeoutId);
       
-      if (!response.ok) {
-        console.warn('[MarketCheck] Sales Stats API error:', response.status, response.statusText);
-        return null;
+      if (salesResponse.ok) {
+        const salesText = await salesResponse.text();
+        let salesData: MarketCheckSalesResponse;
+        
+        try {
+          salesData = JSON.parse(salesText);
+          console.log('[MarketCheck] /v2/sales/car response:', salesData);
+          
+          // Check if we got valid sales data
+          if (salesData.mean || salesData.median) {
+            const result = {
+              averagePrice: Math.round(salesData.mean || salesData.median || 0),
+              medianPrice: Math.round(salesData.median || salesData.mean || 0),
+              salesCount: salesData.count || 0,
+              priceRange: (salesData.min && salesData.max) ? {
+                min: Math.round(salesData.min),
+                max: Math.round(salesData.max)
+              } : (salesData.price_range?.min && salesData.price_range?.max) ? {
+                min: Math.round(salesData.price_range.min),
+                max: Math.round(salesData.price_range.max)
+              } : undefined
+            };
+            
+            console.log('[MarketCheck] Sales stats (90-day actual sales):', result);
+            return result;
+          }
+        } catch (parseError) {
+          console.warn('[MarketCheck] Failed to parse /v2/sales/car response:', salesText.substring(0, 200));
+        }
+      } else {
+        const errorText = await salesResponse.text().catch(() => '');
+        console.log('[MarketCheck] /v2/sales/car returned:', salesResponse.status, errorText.substring(0, 100));
       }
-      
-      const responseText = await response.text();
-      let data: MarketCheckSalesStatsResponse;
-      
-      try {
-        data = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('[MarketCheck] Failed to parse response:', responseText.substring(0, 200));
-        return null;
-      }
-    
-    if (!data.sales_stats || !data.sales_stats.avg_price) {
-      console.log('[MarketCheck] No sales stats data available');
-      return null;
+    } catch (salesError: any) {
+      console.warn('[MarketCheck] /v2/sales/car fetch error:', salesError.message);
     }
     
-    const stats = data.sales_stats;
-    const result = {
-      averagePrice: Math.round(stats.avg_price || 0),
-      medianPrice: Math.round(stats.median_price || stats.avg_price || 0),
-      salesCount: stats.sales_count || 0,
-      priceRange: (stats.min_price && stats.max_price) ? {
-        min: Math.round(stats.min_price),
-        max: Math.round(stats.max_price)
-      } : undefined
+    // STEP 2: Fallback to active listings (dealer + private party in parallel)
+    console.log('[MarketCheck] Falling back to active listings (dealer + FSBO)...');
+    
+    const baseSearchParams: Record<string, string> = {
+      api_key: apiKey,
+      year: year.toString(),
+      make: make.toLowerCase(),
+      model: cleanModel.toLowerCase(),
+      start: '0',
+      rows: '50',
+      stats: 'price',
     };
     
-    console.log('[MarketCheck] Sales stats retrieved:', {
-      averagePrice: result.averagePrice,
-      medianPrice: result.medianPrice,
-      salesCount: result.salesCount,
-      priceRange: result.priceRange
+    // Add trim parameter for hybrids/variants
+    if (parsedTrim) {
+      baseSearchParams.trim = parsedTrim.toLowerCase();
+    }
+    
+    // Fetch dealer listings and private party (FSBO) listings in parallel
+    const dealerUrl = `${apiUrl}/search/car/active?${new URLSearchParams(baseSearchParams).toString()}`;
+    const fsboUrl = `${apiUrl}/search/car/fsbo/active?${new URLSearchParams(baseSearchParams).toString()}`;
+    
+    console.log('[MarketCheck] Fetching dealer listings:', dealerUrl.replace(apiKey, '***'));
+    console.log('[MarketCheck] Fetching FSBO listings:', fsboUrl.replace(apiKey, '***'));
+    
+    // Helper function to fetch and parse listings
+    const fetchListings = async (url: string, source: string): Promise<{ prices: number[]; count: number; stats?: { mean?: number; median?: number; min?: number; max?: number } } | null> => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          console.warn(`[MarketCheck] ${source} error:`, response.status);
+          return null;
+        }
+        
+        const text = await response.text();
+        const data: MarketCheckV2Response = JSON.parse(text);
+        
+        console.log(`[MarketCheck] ${source} response:`, {
+          num_found: data.num_found,
+          listingsCount: data.listings?.length || 0,
+          hasStats: !!data.stats?.price,
+        });
+        
+        const prices = (data.listings || [])
+          .map(l => l.price)
+          .filter((p): p is number => typeof p === 'number' && p > 0);
+        
+        return {
+          prices,
+          count: data.num_found || prices.length,
+          stats: data.stats?.price ? {
+            mean: data.stats.price.mean,
+            median: data.stats.price.median,
+            min: data.stats.price.min,
+            max: data.stats.price.max,
+          } : undefined
+        };
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        console.warn(`[MarketCheck] ${source} fetch error:`, error.message);
+        return null;
+      }
+    };
+    
+    // Fetch both in parallel
+    const [dealerData, fsboData] = await Promise.all([
+      fetchListings(dealerUrl, 'Dealer listings'),
+      fetchListings(fsboUrl, 'FSBO (private party) listings'),
+    ]);
+    
+    // Combine prices from both sources
+    const allPrices: number[] = [];
+    let totalCount = 0;
+    
+    if (dealerData) {
+      allPrices.push(...dealerData.prices);
+      totalCount += dealerData.count;
+    }
+    if (fsboData) {
+      allPrices.push(...fsboData.prices);
+      totalCount += fsboData.count;
+    }
+    
+    console.log('[MarketCheck] Combined results:', {
+      dealerPrices: dealerData?.prices.length || 0,
+      fsboPrices: fsboData?.prices.length || 0,
+      totalPrices: allPrices.length,
+      totalCount,
     });
     
-      return result;
-    } catch (fetchError: any) {
-      clearTimeout(timeoutId);
+    // If we have API stats from either source, prefer those
+    const bestStats = dealerData?.stats || fsboData?.stats;
+    if (bestStats?.mean) {
+      const result = {
+        averagePrice: Math.round(bestStats.mean || 0),
+        medianPrice: Math.round(bestStats.median || bestStats.mean || 0),
+        salesCount: totalCount,
+        priceRange: (bestStats.min && bestStats.max) ? {
+          min: Math.round(bestStats.min),
+          max: Math.round(bestStats.max)
+        } : undefined
+      };
       
-      // Check if it's a DNS/network error
-      if (fetchError.name === 'AbortError') {
-        console.error('[MarketCheck] Request timeout - DNS or network issue');
-        throw new Error('MarketCheck API request timed out - possible DNS or network connectivity issue');
-      } else if (fetchError.code === 'ENOTFOUND' || fetchError.message?.includes('getaddrinfo')) {
-        console.error('[MarketCheck] DNS resolution failed:', fetchError.message);
-        throw new Error('MarketCheck API DNS resolution failed - check network connectivity');
-      }
-      throw fetchError;
+      console.log('[MarketCheck] Price stats from API:', result);
+      return result;
     }
+    
+    // Calculate stats from combined listings
+    if (allPrices.length > 0) {
+      allPrices.sort((a, b) => a - b);
+      const sum = allPrices.reduce((acc, p) => acc + p, 0);
+      const mean = sum / allPrices.length;
+      const mid = Math.floor(allPrices.length / 2);
+      const median = allPrices.length % 2 === 0
+        ? (allPrices[mid - 1] + allPrices[mid]) / 2
+        : allPrices[mid];
+      
+      const result = {
+        averagePrice: Math.round(mean),
+        medianPrice: Math.round(median),
+        salesCount: totalCount,
+        priceRange: {
+          min: Math.round(allPrices[0]),
+          max: Math.round(allPrices[allPrices.length - 1])
+        }
+      };
+      
+      console.log('[MarketCheck] Calculated stats from dealer + FSBO listings:', result);
+      return result;
+    }
+    
+    console.log('[MarketCheck] No usable data from any endpoint');
+    return null;
+    
   } catch (error: any) {
-    // Re-throw DNS/network errors so they can be handled upstream
+    // Handle errors gracefully
     if (error.message?.includes('DNS') || error.message?.includes('timeout') || error.message?.includes('network')) {
-      throw error;
+      console.error('[MarketCheck] Network error:', error.message);
+    } else {
+      console.error('[MarketCheck] API error:', error);
     }
-    console.error('[MarketCheck] Sales Stats API error:', error);
     return null;
   }
 }
@@ -822,35 +1137,42 @@ export async function fetchAllMarketData(
 ): Promise<MarketListingsData> {
   const data: MarketListingsData = {};
   
-  // Fetch Auto.dev listings (real market data from actual listings)
-  const autoDev = await fetchAutoDevData(year, make, model, trim, mileage);
+  // Fetch from both sources in parallel for more accurate market value comparison
+  // Auto.dev provides current listings, MarketCheck provides actual sales data
+  console.log('[Market Data] Fetching from Auto.dev and MarketCheck in parallel...');
+  
+  const [autoDev, marketCheck] = await Promise.all([
+    // Auto.dev listings (real market data from actual listings)
+    fetchAutoDevData(year, make, model, trim, mileage).catch((err) => {
+      console.warn('[Market Data] Auto.dev fetch failed:', err?.message || 'Unknown error');
+      return null;
+    }),
+    // MarketCheck Sales Stats (actual recent sales data)
+    fetchMarketCheckData(year, make, model, mileage, false).catch((err) => {
+      console.warn('[Market Data] MarketCheck fetch failed:', err?.message || 'Unknown error');
+      return null;
+    })
+  ]);
+  
   if (autoDev && autoDev.marketAverage > 0) {
     data.autoDev = autoDev;
-    console.log('[Market Data] Auto.dev listings found:', autoDev.marketAverage);
+    console.log('[Market Data] Auto.dev listings found:', {
+      marketAverage: autoDev.marketAverage,
+      listingsCount: autoDev.rawListings?.length || 0
+    });
   } else {
-    console.log('[Market Data] Auto.dev returned no listings, will use MarketCheck as backup');
+    console.log('[Market Data] Auto.dev returned no listings');
   }
   
-  // Use MarketCheck Sales Stats as backup when Auto.dev has no listings
-  // Also available for paid tier even if Auto.dev has data (for additional insights)
-  const shouldFetchMarketCheck = !data.autoDev || tier === 'paid';
-  
-  if (shouldFetchMarketCheck) {
-    try {
-      const marketCheck = await fetchMarketCheckData(year, make, model, mileage, !data.autoDev);
-      if (marketCheck) {
-        data.marketCheck = marketCheck;
-        console.log('[Market Data] MarketCheck data retrieved:', {
-          hasSalesStats: !!marketCheck.salesStats,
-          averagePrice: marketCheck.salesStats?.averagePrice
-        });
-      }
-    } catch (error: any) {
-      // MarketCheck is optional - failures (e.g., DNS issues) shouldn't break the analysis
-      // Auto.dev data is sufficient for market pricing analysis
-      console.warn('[Market Data] MarketCheck fetch failed (non-critical):', error?.message || 'Unknown error');
-      console.log('[Market Data] Continuing with Auto.dev data only');
-    }
+  if (marketCheck) {
+    data.marketCheck = marketCheck;
+    console.log('[Market Data] MarketCheck data retrieved:', {
+      hasSalesStats: !!marketCheck.salesStats,
+      averagePrice: marketCheck.salesStats?.averagePrice,
+      salesCount: marketCheck.salesStats?.salesCount
+    });
+  } else {
+    console.log('[Market Data] MarketCheck returned no data');
   }
   
   console.log('[Market Data] All sources fetched:', {
@@ -869,107 +1191,111 @@ export function calculateAverageMarketValue(data: MarketListingsData): number {
   console.log('[Market Value] Input data:', {
     hasAutoDev: !!data.autoDev?.marketAverage,
     autoDevValue: data.autoDev?.marketAverage,
+    autoDevListingsCount: data.autoDev?.rawListings?.length || 0,
     hasMarketCheck: !!data.marketCheck,
     marketCheckSalesStats: !!data.marketCheck?.salesStats,
     marketCheckAveragePrice: data.marketCheck?.salesStats?.averagePrice,
+    marketCheckSalesCount: data.marketCheck?.salesStats?.salesCount,
   });
   
-  const values: number[] = [];
+  const autoDevValue = data.autoDev?.marketAverage && data.autoDev.marketAverage > 0 
+    ? data.autoDev.marketAverage 
+    : null;
+  const autoDevCount = data.autoDev?.rawListings?.length || 0;
   
-  // Prioritize Auto.dev listings average if available (most accurate from real listings)
-  if (data.autoDev?.marketAverage && data.autoDev.marketAverage > 0) {
-    values.push(data.autoDev.marketAverage);
-    console.log('[Market Value] Added Auto.dev value:', data.autoDev.marketAverage);
-  }
+  const marketCheckValue = data.marketCheck?.salesStats?.averagePrice && data.marketCheck.salesStats.averagePrice > 0
+    ? data.marketCheck.salesStats.averagePrice
+    : null;
+  const marketCheckCount = data.marketCheck?.salesStats?.salesCount || 0;
   
-  // Add MarketCheck Sales Stats as backup (when Auto.dev has no listings) or additional source
-  if (data.marketCheck?.salesStats?.averagePrice && data.marketCheck.salesStats.averagePrice > 0) {
-    values.push(data.marketCheck.salesStats.averagePrice);
-    console.log('[Market Value] Added MarketCheck Sales Stats average price:', data.marketCheck.salesStats.averagePrice);
-  }
+  // Also check for competitivePrice as fallback
+  const competitivePrice = data.marketCheck?.competitivePrice && data.marketCheck.competitivePrice > 0
+    ? data.marketCheck.competitivePrice
+    : null;
   
-  // Legacy: Also check for competitivePrice if it exists
-  if (data.marketCheck?.competitivePrice && data.marketCheck.competitivePrice > 0) {
-    values.push(data.marketCheck.competitivePrice);
-    console.log('[Market Value] Added MarketCheck competitive price:', data.marketCheck.competitivePrice);
-  }
+  console.log('[Market Value] Extracted values:', {
+    autoDevValue,
+    autoDevCount,
+    marketCheckValue,
+    marketCheckCount,
+    competitivePrice
+  });
   
-  console.log('[Market Value] All values collected:', values);
-  
-  if (values.length === 0) {
-    console.warn('[Market Value] No valid market values found');
-    return 0;
-  }
-  
-  // Validate all values are positive
-  const invalidValues = values.filter(v => v <= 0 || !isFinite(v));
-  if (invalidValues.length > 0) {
-    console.error('[Market Value] Invalid values found:', invalidValues);
-    // Remove invalid values
-    const validValues = values.filter(v => v > 0 && isFinite(v));
-    if (validValues.length === 0) return 0;
-    values.splice(0, values.length, ...validValues);
-    console.log('[Market Value] After filtering invalid values:', values);
-  }
-  
-  // If we have Auto.dev data from real listings, use weighted average if other sources available
-  // Auto.dev listings are actual market prices (most accurate)
-  if (data.autoDev?.marketAverage && data.autoDev.marketAverage > 0) {
-    const autoDevValue = data.autoDev.marketAverage;
-    const otherValues = values.filter(v => v !== autoDevValue && v > 0);
+  // Case 1: We have both Auto.dev and MarketCheck data
+  if (autoDevValue && marketCheckValue) {
+    const discrepancy = Math.abs(autoDevValue - marketCheckValue) / Math.max(autoDevValue, marketCheckValue);
+    console.log('[Market Value] Both sources available, discrepancy:', (discrepancy * 100).toFixed(1) + '%');
     
-    if (otherValues.length > 0) {
-      // Use weighted average: 80% Auto.dev (real listings), 20% other sources
-      const otherAverage = otherValues.reduce((a, b) => a + b, 0) / otherValues.length;
-      const result = Math.round((autoDevValue * 0.8) + (otherAverage * 0.2));
+    // If there's a large discrepancy (>30%), use dynamic weighting based on data quality
+    if (discrepancy > 0.30) {
+      console.log('[Market Value] Large discrepancy detected - using dynamic weighting');
       
-      console.log('[Market Value] Weighted calculation (80% Auto.dev, 20% other sources):', {
+      // If MarketCheck has more sales data points, trust it more
+      // Auto.dev listings are current for-sale inventory; MarketCheck has actual sales history
+      if (marketCheckCount > autoDevCount * 2) {
+        // MarketCheck has significantly more data - weight it higher
+        const result = Math.round((autoDevValue * 0.3) + (marketCheckValue * 0.7));
+        console.log('[Market Value] MarketCheck has more data, using 30/70 weighting:', {
+          autoDevValue,
+          marketCheckValue,
+          result
+        });
+        console.log('[Market Value] ===== FINAL RESULT (MarketCheck-weighted):', result, '=====');
+        return result;
+      } else if (autoDevCount > marketCheckCount * 2) {
+        // Auto.dev has significantly more data - weight it higher
+        const result = Math.round((autoDevValue * 0.7) + (marketCheckValue * 0.3));
+        console.log('[Market Value] Auto.dev has more data, using 70/30 weighting:', {
+          autoDevValue,
+          marketCheckValue,
+          result
+        });
+        console.log('[Market Value] ===== FINAL RESULT (Auto.dev-weighted):', result, '=====');
+        return result;
+      } else {
+        // Similar data counts with large discrepancy - use 50/50 split
+        const result = Math.round((autoDevValue + marketCheckValue) / 2);
+        console.log('[Market Value] Similar data counts, using 50/50 average:', {
+          autoDevValue,
+          marketCheckValue,
+          result
+        });
+        console.log('[Market Value] ===== FINAL RESULT (equal average):', result, '=====');
+        return result;
+      }
+    } else {
+      // Small discrepancy - use balanced 50/50 average since both sources agree
+      const result = Math.round((autoDevValue + marketCheckValue) / 2);
+      console.log('[Market Value] Sources agree (small discrepancy), using 50/50 average:', {
         autoDevValue,
-        otherAverage,
-        otherSourcesCount: otherValues.length,
+        marketCheckValue,
         result
       });
-      
-      if (result <= 0) {
-        console.error('[Market Value] Calculated negative or zero result:', result);
-        return Math.round(autoDevValue); // Fallback to Auto.dev only
-      }
-      
-      console.log('[Market Value] ===== FINAL RESULT (weighted):', result, '=====');
+      console.log('[Market Value] ===== FINAL RESULT (balanced):', result, '=====');
       return result;
-    } else {
-      // Only Auto.dev available, use it directly
-      console.log('[Market Value] Using Auto.dev value only (no other sources):', autoDevValue);
-      console.log('[Market Value] ===== FINAL RESULT (Auto.dev only):', Math.round(autoDevValue), '=====');
-      return Math.round(autoDevValue);
     }
   }
   
-  // Fallback: If Auto.dev has no listings, use MarketCheck Sales Stats
-  if (data.marketCheck?.salesStats?.averagePrice && data.marketCheck.salesStats.averagePrice > 0) {
-    const marketCheckValue = data.marketCheck.salesStats.averagePrice;
-    console.log('[Market Value] Auto.dev has no listings, using MarketCheck Sales Stats as backup');
-    console.log('[Market Value] MarketCheck average price:', marketCheckValue);
-    console.log('[Market Value] Sales count:', data.marketCheck.salesStats.salesCount);
-    console.log('[Market Value] ===== FINAL RESULT (MarketCheck backup):', Math.round(marketCheckValue), '=====');
+  // Case 2: Only Auto.dev data available
+  if (autoDevValue) {
+    console.log('[Market Value] Using Auto.dev value only (no MarketCheck):', autoDevValue);
+    console.log('[Market Value] ===== FINAL RESULT (Auto.dev only):', Math.round(autoDevValue), '=====');
+    return Math.round(autoDevValue);
+  }
+  
+  // Case 3: Only MarketCheck data available
+  if (marketCheckValue) {
+    console.log('[Market Value] Using MarketCheck value only (no Auto.dev):', marketCheckValue);
+    console.log('[Market Value] Sales count:', marketCheckCount);
+    console.log('[Market Value] ===== FINAL RESULT (MarketCheck only):', Math.round(marketCheckValue), '=====');
     return Math.round(marketCheckValue);
   }
   
-  // Simple average if we have multiple values but no Auto.dev
-  if (values.length > 0) {
-    const result = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
-    console.log('[Market Value] Simple average calculation:', {
-      sum: values.reduce((a, b) => a + b, 0),
-      count: values.length,
-      average: values.reduce((a, b) => a + b, 0) / values.length,
-      rounded: result,
-    });
-    if (result <= 0) {
-      console.error('[Market Value] Calculated negative or zero result:', result);
-      return 0;
-    }
-    console.log('[Market Value] ===== FINAL RESULT (simple):', result, '=====');
-    return result;
+  // Case 4: Only competitive price available
+  if (competitivePrice) {
+    console.log('[Market Value] Using competitive price as fallback:', competitivePrice);
+    console.log('[Market Value] ===== FINAL RESULT (competitive price):', Math.round(competitivePrice), '=====');
+    return Math.round(competitivePrice);
   }
   
   // No market data available

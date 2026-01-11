@@ -289,7 +289,62 @@ export function AnalysisResults({ result, onReset }: AnalysisResultsProps) {
         </div>
       )}
 
-      {/* Comparable Listings - Paid Only */}
+      {/* Market Data Transparency - Free Tier */}
+      {isFree && result.marketData?.autoDev && (
+        <div className="bg-white p-6 md:p-8 rounded-xl border border-gray-200 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2.5 bg-blue-600/10 rounded-lg">
+              <MapPin className="w-5 h-5 text-blue-600" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900">Market Data Sources</h3>
+          </div>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <p className="text-sm text-gray-600 mb-1">Listings Analyzed</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {result.comparableListings?.length || result.marketData.autoDev.rawListings?.length || 'N/A'}
+                </p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-4">
+                <p className="text-sm text-gray-600 mb-1">Price Range</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  ${result.marketData.autoDev.priceRange.min.toLocaleString()} - ${result.marketData.autoDev.priceRange.max.toLocaleString()}
+                </p>
+              </div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <p className="text-sm text-gray-600 mb-1">Estimated Market Value</p>
+              <p className="text-2xl font-semibold text-gray-900">
+                ${result.marketData.autoDev.marketAverage.toLocaleString()}
+              </p>
+            </div>
+            {result.comparableListings && result.comparableListings.length > 0 && (
+              <div className="pt-2">
+                <p className="text-sm font-medium text-gray-700 mb-3">Sample Listings Used:</p>
+                <div className="space-y-2">
+                  {result.comparableListings.slice(0, 3).map((listing, i) => (
+                    <div key={i} className="flex justify-between items-center text-sm bg-gray-50 rounded-lg px-3 py-2">
+                      <span className="font-medium text-gray-900">${listing.price.toLocaleString()}</span>
+                      <span className="text-gray-600">{listing.mileage.toLocaleString()} mi • {listing.location}</span>
+                    </div>
+                  ))}
+                </div>
+                {result.comparableListings.length > 3 && (
+                  <p className="text-xs text-gray-500 mt-2 text-center">
+                    +{result.comparableListings.length - 3} more listings included in analysis
+                  </p>
+                )}
+              </div>
+            )}
+            <p className="text-xs text-gray-500 pt-2">
+              Market data sourced from active vehicle listings. Premium reports include full listing details with mileage, location, and days on market.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Comparable Listings - Paid Only (Full Details) */}
       {(() => {
         console.log('[Client] Comparable Listings Debug:', {
           isFree,
